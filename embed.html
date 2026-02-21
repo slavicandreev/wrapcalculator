@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WrapCalc Embed Test</title>
+  <style>
+    body {
+      font-family: Georgia, serif;
+      background: #f5f0eb;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }
+    .host-page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    h1 { color: #8B4513; }
+    p { line-height: 1.7; }
+    /* Intentionally conflicting styles to test isolation */
+    button {
+      background: red !important;
+      color: yellow !important;
+      border-radius: 0 !important;
+    }
+    select { font-size: 20px !important; }
+  </style>
+</head>
+<body>
+  <div class="host-page">
+    <h1>Example Auto Shop Website</h1>
+    <p>
+      Welcome to our shop! We specialize in premium vinyl wraps. Use the calculator
+      below to get an instant estimate for your project.
+    </p>
+    <p>
+      Note: This page has intentionally conflicting CSS (red buttons, yellow text,
+      large selects) to verify that the embedded widget is style-isolated via Shadow DOM.
+    </p>
+
+    <hr style="margin: 40px 0; border-color: #d4c4b0;" />
+
+    <!-- Embed container -->
+    <div id="wrap-calc-container" style="border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+    </div>
+
+    <hr style="margin: 40px 0; border-color: #d4c4b0;" />
+    <p style="font-size: 14px; color: #666;">
+      The calculator above is embedded via a single script tag. Styles are fully
+      isolated — the widget is unaffected by this page's conflicting CSS.
+    </p>
+  </div>
+
+  <!--
+    Embed script — in production this points to your CDN URL.
+    For local testing: run `npm run build` then serve the dist/ folder.
+
+    Usage on any website:
+    <script
+      src="https://your-domain.com/embed.js"
+      data-mode="inline"
+      data-container="#wrap-calc-container"
+      data-cta-url="https://yourshop.com/contact"
+      data-accent-color="#ff6600"
+    ></script>
+  -->
+  <script
+    src="./dist/embed.js"
+    data-mode="inline"
+    data-container="#wrap-calc-container"
+    data-cta-url="https://example.com/contact"
+    data-accent-color="#3b82f6"
+  ></script>
+</body>
+</html>

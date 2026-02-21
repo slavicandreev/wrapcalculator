@@ -1,0 +1,68 @@
+import type { Addon } from '../types';
+
+export const ADDONS: Addon[] = [
+  {
+    id: 'chrome_accents',
+    label: 'Chrome Delete / Accents',
+    description: 'Wrap chrome trim, window surrounds, and badges in matte or gloss black.',
+    priceMin: 200,
+    priceMax: 500,
+    icon: '✨',
+  },
+  {
+    id: 'roof_wrap',
+    label: 'Contrast Roof Wrap',
+    description: 'Two-tone look with a different color or finish on the roof panel.',
+    priceMin: 400,
+    priceMax: 800,
+    icon: '🏠',
+  },
+  {
+    id: 'mirror_caps',
+    label: 'Mirror Caps',
+    description: 'Side mirror caps wrapped to match or contrast the main wrap color.',
+    priceMin: 100,
+    priceMax: 200,
+    icon: '🪞',
+  },
+  {
+    id: 'headlight_tint',
+    label: 'Headlight / Taillight Tint',
+    description: 'Smoked film on headlights and taillights for a sleek, uniform look.',
+    priceMin: 150,
+    priceMax: 300,
+    icon: '💡',
+  },
+  {
+    id: 'interior_trim',
+    label: 'Interior Trim Wrap',
+    description: 'Dashboard panels, center console, and door trim wrapped in vinyl.',
+    priceMin: 300,
+    priceMax: 600,
+    icon: '🚗',
+  },
+  {
+    id: 'vinyl_lettering',
+    label: 'Cut Vinyl Lettering',
+    description: 'Business name, phone number, or custom text cut from vinyl.',
+    priceMin: 100,
+    priceMax: 300,
+    icon: '🔤',
+  },
+  {
+    id: 'paint_protection',
+    label: 'Paint Protection Film (PPF)',
+    description: 'Clear self-healing film on high-impact areas (hood, bumper, mirrors).',
+    priceMin: 500,
+    priceMax: 1200,
+    icon: '🛡️',
+  },
+  {
+    id: 'design_graphics',
+    label: 'Custom Design / Graphics',
+    description: 'Professionally designed graphic elements, patterns, or artwork.',
+    priceMin: 300,
+    priceMax: 800,
+    icon: '🎨',
+  },
+];
