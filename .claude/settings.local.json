@@ -10,7 +10,10 @@
       "Bash(nvm use:*)",
       "Bash(npm run build:app:*)",
       "Bash(open:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(curl:*)",
+      "Bash(python3:*)"
     ]
   }
 }

@@ -2,21 +2,38 @@ import { useState, useEffect, useCallback } from 'react';
 import { useWizard } from '../../context/WizardContext';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { CarVisualization } from '../visualization/CarVisualization';
-import { fetchAllMakes, fetchModelsForMake } from '../../services/nhtsaApi';
-import { fetchTrims } from '../../services/carApi';
+import { fetchAllMakes, fetchModelsForMake, guessBodyClassFromModel } from '../../services/nhtsaApi';
+import { fetchTrims, fetchBodyStyle } from '../../services/carApi';
+import { normalizeBodyClass } from '../../data/vehicleAreas';
 import { MANUAL_BODY_TYPES } from '../../data/vehicleAreas';
 import type { VehicleMake, VehicleModel } from '../../types';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: CURRENT_YEAR - 1989 }, (_, i) => CURRENT_YEAR - i);
 
-// Popular makes sorted first
-const POPULAR_MAKES = ['Toyota', 'Honda', 'Ford', 'Chevrolet', 'BMW', 'Mercedes-Benz', 'Audi', 'Tesla', 'Dodge', 'Jeep', 'Ram', 'GMC', 'Nissan', 'Hyundai', 'Kia', 'Subaru', 'Volkswagen', 'Lexus', 'Acura', 'Infiniti', 'Cadillac', 'Lincoln', 'Buick'];
+// Popular makes sorted first (compared case-insensitively since NHTSA returns ALL CAPS)
+const POPULAR_MAKES_UPPER = ['TOYOTA', 'HONDA', 'FORD', 'CHEVROLET', 'BMW', 'MERCEDES-BENZ', 'AUDI', 'TESLA', 'DODGE', 'JEEP', 'RAM', 'GMC', 'NISSAN', 'HYUNDAI', 'KIA', 'SUBARU', 'VOLKSWAGEN', 'LEXUS', 'ACURA', 'INFINITI', 'CADILLAC', 'LINCOLN', 'BUICK'];
+
+// Convert "TOYOTA" → "Toyota", "BMW" → "BMW" (keep short all-caps as-is)
+function toTitleCase(str: string): string {
+  return str
+    .split(/[\s-]/)
+    .map(w => w.length <= 3 ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(str.includes('-') ? '-' : ' ');
+}
 
 function sortMakes(makes: VehicleMake[]): VehicleMake[] {
-  return [...makes].sort((a, b) => {
-    const aIdx = POPULAR_MAKES.indexOf(a.makeName);
-    const bIdx = POPULAR_MAKES.indexOf(b.makeName);
+  // Normalize display names and sort popular ones first
+  const normalized = makes.map(m => ({
+    ...m,
+    makeName: toTitleCase(m.makeName),
+  }));
+
+  return normalized.sort((a, b) => {
+    const aUpper = a.makeName.toUpperCase();
+    const bUpper = b.makeName.toUpperCase();
+    const aIdx = POPULAR_MAKES_UPPER.indexOf(aUpper);
+    const bIdx = POPULAR_MAKES_UPPER.indexOf(bUpper);
     if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
     if (aIdx !== -1) return -1;
     if (bIdx !== -1) return 1;
@@ -58,19 +75,38 @@ export function Step2VehicleSelect() {
       .finally(() => setLoadingModels(false));
   }, [vehicle.makeId, vehicle.year]);
 
-  // Load trims when model + year + make changes
+  // Load trims + resolve body class when model selected
   const loadTrims = useCallback(async () => {
     if (!vehicle.makeName || !vehicle.modelName || !vehicle.year) return;
+
+    // 1. Immediately apply heuristic body class guess so visualization shows something fast
+    const guessed = guessBodyClassFromModel(vehicle.modelName);
+    if (guessed) {
+      dispatch({ type: 'SET_VEHICLE', payload: { bodyClass: guessed } });
+    }
+
     setLoadingTrims(true);
     try {
-      const trimData = await fetchTrims(vehicle.makeName, vehicle.modelName, vehicle.year);
+      const [trimData, bodyStyleRaw] = await Promise.all([
+        fetchTrims(vehicle.makeName, vehicle.modelName, vehicle.year),
+        fetchBodyStyle(vehicle.makeName, vehicle.modelName, vehicle.year),
+      ]);
       setTrims(trimData);
+
+      // CarAPI body style overrides heuristic when available
+      if (bodyStyleRaw) {
+        const normalized = normalizeBodyClass(bodyStyleRaw);
+        dispatch({ type: 'SET_VEHICLE', payload: { bodyClass: normalized } });
+      } else if (!guessed) {
+        // Final fallback: default to Sedan
+        dispatch({ type: 'SET_VEHICLE', payload: { bodyClass: 'Sedan' } });
+      }
     } catch {
       setTrims([]);
     } finally {
       setLoadingTrims(false);
     }
-  }, [vehicle.makeName, vehicle.modelName, vehicle.year]);
+  }, [vehicle.makeName, vehicle.modelName, vehicle.year, dispatch]);
 
   useEffect(() => {
     if (vehicle.modelName) loadTrims();
