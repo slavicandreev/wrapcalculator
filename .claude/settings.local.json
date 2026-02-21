@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss:*)",
+      "Bash(git -C /Users/slavic/Documents/projects/wrapcostcalculator init)",
+      "Bash(git -C /Users/slavic/Documents/projects/wrapcostcalculator add -A)",
+      "Bash(git -C /Users/slavic/Documents/projects/wrapcostcalculator commit -m \"chore: init Vite React TS + Tailwind\")"
+    ]
+  }
+}
