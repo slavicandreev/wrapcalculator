@@ -1,5 +1,5 @@
 import { useWizard } from '../../context/WizardContext';
-import { ThreeAngleView } from '../visualization/ThreeAngleView';
+import { CarVisualization } from '../visualization/CarVisualization';
 import { MATERIAL_PRICING, COVERAGE_OPTIONS } from '../../data/pricing';
 import { getColorById } from '../../data/colors';
 import { getStateByCode } from '../../data/states';
@@ -46,9 +46,9 @@ export function Step5Estimate() {
         </p>
       </div>
 
-      {/* 3-Angle Car View */}
+      {/* Car View */}
       <div className="mb-8">
-        <ThreeAngleView
+        <CarVisualization
           bodyClass={vehicle.bodyClass}
           make={vehicle.makeName}
           model={vehicle.modelName}
@@ -56,6 +56,9 @@ export function Step5Estimate() {
           colorHex={selectedColor?.hex ?? null}
           coverage={customization.coverage}
           material={customization.material}
+          angle="side"
+          size="large"
+          className="rounded-2xl"
         />
       </div>
 
