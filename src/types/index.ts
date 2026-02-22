@@ -75,6 +75,8 @@ export interface WizardCustomization {
 export interface PriceRange {
   min: number;
   max: number;
+  singleMin?: number; // per-vehicle price (fleet only)
+  singleMax?: number;
 }
 
 export interface WizardState {
@@ -82,6 +84,7 @@ export interface WizardState {
   projectType: ProjectType | null;
   vehicle: WizardVehicle;
   stateCode: string | null;
+  fleetSize: number | null; // only used when projectType === 'fleet'
   customization: WizardCustomization;
 }
 
@@ -95,6 +98,7 @@ export type WizardAction =
   | { type: 'SET_COVERAGE'; payload: WrapCoverage }
   | { type: 'TOGGLE_ADDON'; payload: string }
   | { type: 'SET_STEP'; payload: 1 | 2 | 3 | 4 | 5 }
+  | { type: 'SET_FLEET_SIZE'; payload: number | null }
   | { type: 'RESET' };
 
 // ─── Embed Config ─────────────────────────────────────────────────────────────

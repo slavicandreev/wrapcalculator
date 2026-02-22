@@ -15,6 +15,7 @@ export const initialState: WizardState = {
   projectType: null,
   vehicle: initialVehicle,
   stateCode: null,
+  fleetSize: null,
   customization: {
     material: null,
     color: null,
@@ -26,7 +27,11 @@ export const initialState: WizardState = {
 export function wizardReducer(state: WizardState, action: WizardAction): WizardState {
   switch (action.type) {
     case 'SET_PROJECT_TYPE':
-      return { ...state, projectType: action.payload };
+      return {
+        ...state,
+        projectType: action.payload,
+        fleetSize: action.payload === 'fleet' ? (state.fleetSize ?? 2) : null,
+      };
 
     case 'SET_VEHICLE': {
       const newVehicle = { ...state.vehicle, ...action.payload };
@@ -76,6 +81,9 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
         customization: { ...state.customization, selectedAddons: updated },
       };
     }
+
+    case 'SET_FLEET_SIZE':
+      return { ...state, fleetSize: action.payload };
 
     case 'SET_STEP':
       return { ...state, currentStep: action.payload };
