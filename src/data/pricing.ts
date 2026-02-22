@@ -102,11 +102,27 @@ export const COVERAGE_OPTIONS: CoverageOption[] = [
 ];
 
 // ─── Project Type Adjustments ─────────────────────────────────────────────────
-export const PROJECT_TYPE_ADJUSTMENTS: Record<ProjectType, number> = {
+export const PROJECT_TYPE_ADJUSTMENTS: Record<'personal' | 'business', number> = {
   personal: 1.0,
-  business: 1.1,  // business wraps often need design/graphics premium
-  fleet:    0.85, // fleet discount for volume
+  business: 1.1,
 };
+
+// Fleet tier multipliers (per-vehicle discount, applied before multiplying by count)
+export const FLEET_TIERS: { min: number; max: number | null; multiplier: number; label: string }[] = [
+  { min: 2,  max: 4,    multiplier: 0.90, label: '10% fleet discount' },
+  { min: 5,  max: 9,    multiplier: 0.85, label: '15% fleet discount' },
+  { min: 10, max: null, multiplier: 0.80, label: '20% fleet discount' },
+];
+
+export function getFleetMultiplier(size: number): number {
+  const tier = FLEET_TIERS.find(t => size >= t.min && (t.max === null || size <= t.max));
+  return tier?.multiplier ?? 0.85; // fallback to 15% if somehow out of range
+}
+
+export function getFleetDiscountLabel(size: number): string {
+  const tier = FLEET_TIERS.find(t => size >= t.min && (t.max === null || size <= t.max));
+  return tier?.label ?? 'Fleet discount';
+}
 
 // ─── Price Floors (decal minimum) ─────────────────────────────────────────────
 export const DECAL_PRICE_FLOOR = { min: 200, max: 800 };
