@@ -147,7 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const emailOptions: Parameters<typeof resend.emails.send>[0] = {
       from: 'WrapMatchPro <onboarding@resend.dev>',
       to: ['wrapmatchpro@gmail.com'],
-      reply_to: payload.email,
+      replyTo: payload.email,
       subject: `New wrap quote: ${vehicleName} — ${payload.name}`,
       html,
     };
@@ -157,7 +157,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         {
           filename: 'car-photo.jpg',
           content: photoBuffer.toString('base64'),
-          content_type: photoMimeType,
+          contentType: photoMimeType,
         },
       ];
     }
