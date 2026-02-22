@@ -1,4 +1,4 @@
-import type { MaterialType, WrapCoverage, ProjectType } from '../types';
+import type { MaterialType, WrapCoverage } from '../types';
 
 // ─── Material Costs (per sq ft, material only) ────────────────────────────────
 export interface MaterialCost {
