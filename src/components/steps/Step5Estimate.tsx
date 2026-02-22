@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useWizard } from '../../context/WizardContext';
 import { CarVisualization } from '../visualization/CarVisualization';
 import { MATERIAL_PRICING, COVERAGE_OPTIONS } from '../../data/pricing';
@@ -5,6 +6,7 @@ import { getColorById } from '../../data/colors';
 import { getStateByCode } from '../../data/states';
 import { ADDONS } from '../../data/addons';
 import { formatCurrency, formatPriceRange } from '../../utils/formatCurrency';
+import { QuoteFormModal } from '../QuoteFormModal';
 
 const PROJECT_TYPE_LABELS: Record<string, string> = {
   personal: 'Personal Vehicle',
@@ -23,6 +25,7 @@ export function Step5Estimate() {
     ? COVERAGE_OPTIONS.find(c => c.id === customization.coverage)
     : null;
   const selectedAddons = ADDONS.filter(a => customization.selectedAddons.includes(a.id));
+  const [quoteModalOpen, setQuoteModalOpen] = useState(false);
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -112,7 +115,10 @@ export function Step5Estimate() {
 
       {/* CTAs */}
       <div className="flex flex-col sm:flex-row gap-3 mb-8">
-        <button className="flex-1 bg-brand-600 text-white font-semibold py-3.5 px-6 rounded-xl hover:bg-brand-700 transition-colors shadow-sm text-center">
+        <button
+          onClick={() => setQuoteModalOpen(true)}
+          className="flex-1 bg-brand-600 text-white font-semibold py-3.5 px-6 rounded-xl hover:bg-brand-700 transition-colors shadow-sm text-center"
+        >
           Get a Free Quote →
         </button>
         <button
@@ -137,6 +143,13 @@ export function Step5Estimate() {
           </div>
         ))}
       </div>
+
+      <QuoteFormModal
+        isOpen={quoteModalOpen}
+        onClose={() => setQuoteModalOpen(false)}
+        wizardState={state}
+        priceRange={priceRange}
+      />
     </div>
   );
 }
