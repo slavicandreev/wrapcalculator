@@ -54,7 +54,6 @@ export function Step2VehicleSelect() {
   const [trims, setTrims] = useState<string[]>([]);
   const [loadingMakes, setLoadingMakes] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
-  const [loadingTrims, setLoadingTrims] = useState(false);
   const [apiError, setApiError] = useState(false);
 
   // Load makes on mount
@@ -89,7 +88,6 @@ export function Step2VehicleSelect() {
       dispatch({ type: 'SET_VEHICLE', payload: { bodyClass: guessed } });
     }
 
-    setLoadingTrims(true);
     try {
       const [trimData, bodyStyleRaw] = await Promise.all([
         fetchTrims(vehicle.makeName, vehicle.modelName, vehicle.year),
@@ -107,8 +105,6 @@ export function Step2VehicleSelect() {
       }
     } catch {
       setTrims([]);
-    } finally {
-      setLoadingTrims(false);
     }
   }, [vehicle.makeName, vehicle.modelName, vehicle.year, dispatch]);
 
@@ -211,7 +207,7 @@ export function Step2VehicleSelect() {
           </div>
 
           {/* Trim (optional) */}
-          {(trims.length > 0 || loadingTrims) && (
+          {trims.length > 0 && (
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                 Trim <span className="text-slate-400 font-normal">(optional)</span>
@@ -220,19 +216,13 @@ export function Step2VehicleSelect() {
                 <select
                   value={vehicle.trim ?? ''}
                   onChange={e => dispatch({ type: 'SET_VEHICLE', payload: { trim: e.target.value || null } })}
-                  disabled={loadingTrims}
-                  className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-sm font-medium text-slate-800 bg-white focus:border-brand-400 focus:outline-none transition-colors disabled:opacity-50"
+                  className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-sm font-medium text-slate-800 bg-white focus:border-brand-400 focus:outline-none transition-colors"
                 >
                   <option value="">Any trim</option>
                   {trims.map(t => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
-                {loadingTrims && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <LoadingSpinner size="sm" />
-                  </div>
-                )}
               </div>
             </div>
           )}
