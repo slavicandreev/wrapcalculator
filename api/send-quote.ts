@@ -26,6 +26,10 @@ interface QuotePayload {
   priceMin: number | null;
   priceMax: number | null;
   imageUrl: string | null;
+  // Customer-supplied fields
+  notes: string | null;
+  carPhotoBase64: string | null;
+  carPhotoMimeType: string | null;
 }
 
 const TIMELINE_LABELS: Record<string, string> = {
@@ -49,6 +53,27 @@ const COVERAGE_LABELS: Record<string, string> = {
   decal: 'Decal Only',
 };
 
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_NOTES_LENGTH = 2000;
+
+// Allowed magic bytes for JPEG and PNG
+const MAGIC_BYTES: { mime: string; bytes: number[] }[] = [
+  { mime: 'image/jpeg', bytes: [0xff, 0xd8, 0xff] },
+  { mime: 'image/png',  bytes: [0x89, 0x50, 0x4e, 0x47] },
+];
+
+function validateImageMagicBytes(base64: string): boolean {
+  try {
+    // Only decode first few bytes — Buffer.from handles base64 automatically
+    const buf = Buffer.from(base64.slice(0, 16), 'base64');
+    return MAGIC_BYTES.some(({ bytes }) =>
+      bytes.every((b, i) => buf[i] === b)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function buildEmailHtml(payload: QuotePayload): string {
   const vehicle = payload.vehicle;
   const vehicleStr = [vehicle.year, vehicle.makeName, vehicle.modelName, vehicle.trim]
@@ -67,6 +92,26 @@ function buildEmailHtml(payload: QuotePayload): string {
     : '';
   const aiPreviewNote = payload.sendAiPreview
     ? '<p style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;color:#1e40af;font-size:13px;margin-top:24px;">✨ <strong>AI Preview requested.</strong> Car photo attached — use it to generate the wrap preview.</p>'
+    : '';
+
+  // Sanitise and truncate notes for safe HTML embedding
+  const safeNotes = payload.notes
+    ? payload.notes
+        .slice(0, MAX_NOTES_LENGTH)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>')
+    : null;
+
+  const notesSection = safeNotes
+    ? `
+  <h3 style="border-bottom:1px solid #e2e8f0;padding-bottom:8px;margin-top:24px;">Notes from Customer</h3>
+  <p style="font-size:14px;color:#1e293b;line-height:1.6;white-space:pre-wrap;">${safeNotes}</p>`
+    : '';
+
+  const customerPhotoNote = payload.carPhotoBase64
+    ? '<p style="font-size:13px;color:#64748b;margin-top:8px;">📷 Customer also attached a photo of their car (see attachment).</p>'
     : '';
 
   return `<!DOCTYPE html>
@@ -96,6 +141,8 @@ function buildEmailHtml(payload: QuotePayload): string {
   </table>
 
   ${aiPreviewNote}
+  ${customerPhotoNote}
+  ${notesSection}
 
   <p style="color:#94a3b8;font-size:12px;margin-top:32px;">Sent from WrapMatchPro cost calculator</p>
 </body>
@@ -113,27 +160,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Missing required fields: name, email, timeline' });
   }
 
+  // Validate customer photo if present
+  if (payload.carPhotoBase64) {
+    // Server-side size cap: base64 string length * 0.75 ≈ byte count
+    const approxBytes = payload.carPhotoBase64.length * 0.75;
+    if (approxBytes > MAX_PHOTO_BYTES) {
+      return res.status(400).json({ error: 'Customer photo exceeds 5 MB limit' });
+    }
+    if (!validateImageMagicBytes(payload.carPhotoBase64)) {
+      return res.status(400).json({ error: 'Customer photo must be a JPEG or PNG image' });
+    }
+  }
+
+  // Truncate notes server-side as a safety net
+  if (payload.notes && payload.notes.length > MAX_NOTES_LENGTH) {
+    payload.notes = payload.notes.slice(0, MAX_NOTES_LENGTH);
+  }
+
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
     return res.status(500).json({ error: 'Email service not configured' });
   }
 
   try {
-    // Optionally fetch car photo for attachment
-    let photoBuffer: Buffer | null = null;
-    let photoMimeType = 'image/jpeg';
+    // Optionally fetch IMAGIN car photo for AI preview attachment
+    let imaginePhotoBuffer: Buffer | null = null;
+    let imaginePhotoMimeType = 'image/jpeg';
 
     if (payload.sendAiPreview && payload.imageUrl) {
       try {
         const imgRes = await fetch(payload.imageUrl);
         if (imgRes.ok) {
           const arrayBuffer = await imgRes.arrayBuffer();
-          photoBuffer = Buffer.from(arrayBuffer);
-          photoMimeType = imgRes.headers.get('content-type') || 'image/jpeg';
+          imaginePhotoBuffer = Buffer.from(arrayBuffer);
+          imaginePhotoMimeType = imgRes.headers.get('content-type') || 'image/jpeg';
         }
       } catch {
-        // If photo fetch fails, send email without attachment
-        console.warn('Failed to fetch car photo for attachment');
+        // If photo fetch fails, send email without IMAGIN attachment
+        console.warn('Failed to fetch IMAGIN car photo for attachment');
       }
     }
 
@@ -150,16 +214,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       replyTo: payload.email,
       subject: `New wrap quote: ${vehicleName} — ${payload.name}`,
       html,
+      attachments: [],
     };
 
-    if (photoBuffer) {
-      emailOptions.attachments = [
-        {
-          filename: 'car-photo.jpg',
-          content: photoBuffer.toString('base64'),
-          contentType: photoMimeType,
-        },
-      ];
+    // Attach IMAGIN car photo (for AI preview generation)
+    if (imaginePhotoBuffer) {
+      emailOptions.attachments!.push({
+        filename: 'car-photo.jpg',
+        content: imaginePhotoBuffer.toString('base64'),
+        contentType: imaginePhotoMimeType,
+      });
+    }
+
+    // Attach customer's own car photo
+    if (payload.carPhotoBase64) {
+      const ext = payload.carPhotoMimeType === 'image/png' ? 'png' : 'jpg';
+      emailOptions.attachments!.push({
+        filename: `customer-car-photo.${ext}`,
+        content: payload.carPhotoBase64,
+        contentType: payload.carPhotoMimeType ?? 'image/jpeg',
+      });
+    }
+
+    // Remove empty attachments array to avoid Resend quirks
+    if (emailOptions.attachments!.length === 0) {
+      delete emailOptions.attachments;
     }
 
     const { error: sendError } = await resend.emails.send(emailOptions);

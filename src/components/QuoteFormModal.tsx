@@ -21,11 +21,31 @@ const TIMELINE_OPTIONS: { value: Timeline; label: string }[] = [
   { value: 'researching', label: 'Just researching' },
 ];
 
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB
+
+function readFileAsBase64(file: File): Promise<{ base64: string; mimeType: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      // dataUrl format: "data:<mimeType>;base64,<data>"
+      const commaIdx = dataUrl.indexOf(',');
+      const base64 = dataUrl.slice(commaIdx + 1);
+      resolve({ base64, mimeType: file.type || 'image/jpeg' });
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function QuoteFormModal({ isOpen, onClose, wizardState, priceRange }: QuoteFormModalProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [timeline, setTimeline] = useState<Timeline | ''>('');
   const [sendAiPreview, setSendAiPreview] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [carPhoto, setCarPhoto] = useState<File | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +62,22 @@ export function QuoteFormModal({ isOpen, onClose, wizardState, priceRange }: Quo
     ? buildImagineUrl({ make: vehicle.makeName, model: vehicle.modelName, year: vehicle.year, angle: 'side', width: 800 })
     : null;
 
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setPhotoError(null);
+    if (!file) {
+      setCarPhoto(null);
+      return;
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setPhotoError('Photo must be under 5 MB. Please choose a smaller file.');
+      setCarPhoto(null);
+      e.target.value = '';
+      return;
+    }
+    setCarPhoto(file);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!timeline) return;
@@ -50,6 +86,15 @@ export function QuoteFormModal({ isOpen, onClose, wizardState, priceRange }: Quo
     setError(null);
 
     try {
+      let carPhotoBase64: string | null = null;
+      let carPhotoMimeType: string | null = null;
+
+      if (carPhoto) {
+        const result = await readFileAsBase64(carPhoto);
+        carPhotoBase64 = result.base64;
+        carPhotoMimeType = result.mimeType;
+      }
+
       const res = await fetch('/api/send-quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,6 +119,9 @@ export function QuoteFormModal({ isOpen, onClose, wizardState, priceRange }: Quo
           priceMin: priceRange?.min ?? null,
           priceMax: priceRange?.max ?? null,
           imageUrl,
+          notes: notes.trim() || null,
+          carPhotoBase64,
+          carPhotoMimeType,
         }),
       });
 
@@ -95,7 +143,7 @@ export function QuoteFormModal({ isOpen, onClose, wizardState, priceRange }: Quo
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
         {/* Close button */}
         <button
           type="button"
@@ -178,6 +226,48 @@ export function QuoteFormModal({ isOpen, onClose, wizardState, priceRange }: Quo
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* Notes textarea */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="quote-notes">
+                  Anything else we should know? <span className="text-slate-400 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  id="quote-notes"
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  placeholder="Special requests, design ideas, questions…"
+                  rows={3}
+                  maxLength={2000}
+                  className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-none"
+                />
+                {notes.length > 1800 && (
+                  <p className="text-xs text-slate-400 mt-1 text-right">{notes.length}/2000</p>
+                )}
+              </div>
+
+              {/* Car photo upload */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="quote-photo">
+                  Upload a photo of your car <span className="text-slate-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  id="quote-photo"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic,image/*"
+                  onChange={handlePhotoChange}
+                  className="w-full text-sm text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 cursor-pointer"
+                />
+                {photoError && (
+                  <p className="text-xs text-red-600 mt-1">{photoError}</p>
+                )}
+                {carPhoto && !photoError && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    {carPhoto.name} ({(carPhoto.size / 1024 / 1024).toFixed(1)} MB)
+                  </p>
+                )}
+                <p className="text-xs text-slate-400 mt-1">Max 5 MB. JPEG or PNG preferred.</p>
               </div>
 
               <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:border-brand-300 hover:bg-brand-50 transition-colors cursor-pointer">
