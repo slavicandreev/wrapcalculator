@@ -36,7 +36,7 @@ export function SelectCard({
       aria-pressed={selected}
     >
       {badge && (
-        <span className="absolute top-3 left-3 bg-brand-100 text-brand-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+        <span className="absolute -top-2 right-3 bg-brand-100 text-brand-700 text-xs font-semibold px-2 py-0.5 rounded-full">
           {badge}
         </span>
       )}
