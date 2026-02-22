@@ -8,6 +8,8 @@ import { normalizeBodyClass } from '../../data/vehicleAreas';
 import { MANUAL_BODY_TYPES } from '../../data/vehicleAreas';
 import type { VehicleMake, VehicleModel } from '../../types';
 
+const FLEET_SIZE_OPTIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50];
+
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: CURRENT_YEAR - 1989 }, (_, i) => CURRENT_YEAR - i);
 
@@ -44,6 +46,8 @@ function sortMakes(makes: VehicleMake[]): VehicleMake[] {
 export function Step2VehicleSelect() {
   const { state, dispatch } = useWizard();
   const { vehicle } = state;
+  const isFleet = state.projectType === 'fleet';
+  const fleetSize = state.fleetSize ?? 2;
 
   const [makes, setMakes] = useState<VehicleMake[]>([]);
   const [models, setModels] = useState<VehicleModel[]>([]);
@@ -230,6 +234,31 @@ export function Step2VehicleSelect() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Fleet size — only shown for fleet project type */}
+          {isFleet && (
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Number of vehicles
+              </label>
+              <select
+                value={fleetSize}
+                onChange={e => dispatch({ type: 'SET_FLEET_SIZE', payload: Number(e.target.value) })}
+                className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-sm font-medium text-slate-800 bg-white focus:border-brand-400 focus:outline-none transition-colors"
+              >
+                {FLEET_SIZE_OPTIONS.map(n => (
+                  <option key={n} value={n}>
+                    {n === 50 ? '50+ vehicles' : `${n} vehicles`}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-400 mt-1.5">
+                {fleetSize >= 10 ? '20% volume discount applied' :
+                 fleetSize >= 5  ? '15% volume discount applied' :
+                                   '10% volume discount applied'}
+              </p>
             </div>
           )}
 
