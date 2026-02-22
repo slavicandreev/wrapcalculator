@@ -4,6 +4,7 @@ import {
   LABOR_RATE,
   COVERAGE_MULTIPLIER,
   PROJECT_TYPE_ADJUSTMENTS,
+  getFleetMultiplier,
   DECAL_PRICE_FLOOR,
   PRICE_ROUND_TO,
 } from '../data/pricing';
@@ -16,11 +17,9 @@ function roundTo(value: number, nearest: number): number {
 }
 
 export function calculatePrice(state: WizardState): PriceRange | null {
-  const { projectType, vehicle, stateCode, customization } = state;
+  const { projectType, vehicle, stateCode, customization, fleetSize } = state;
 
-  // Need at least bodyClass + material + coverage to show a price
   if (!customization.material || !customization.coverage) {
-    // Show a rough estimate if we have bodyClass even without material
     if (!vehicle.bodyClass && !customization.coverage) return null;
     if (!customization.coverage) return null;
   }
@@ -36,41 +35,56 @@ export function calculatePrice(state: WizardState): PriceRange | null {
   const coverage = customization.coverage ?? 'full';
   const coverageMult = COVERAGE_MULTIPLIER[coverage] ?? 1.0;
 
-  // 4. Project type adjustment
-  const projAdj = PROJECT_TYPE_ADJUSTMENTS[projectType ?? 'personal'] ?? 1.0;
+  // 4. Project type adjustment (personal / business only — fleet handled separately)
+  const projAdj = projectType === 'fleet'
+    ? 1.0 // fleet multiplier applied after, along with count
+    : (PROJECT_TYPE_ADJUSTMENTS[projectType ?? 'personal'] ?? 1.0);
 
   // 5. State/regional multiplier
   const stateData = stateCode ? getStateByCode(stateCode) : undefined;
   const stateMult = stateData?.multiplier ?? 1.0;
 
-  // 6. Base cost: area × coverage × (material + labor) × state × projectType
+  // 6. Single-vehicle base cost
   const coveredAreaMin = area.min * coverageMult;
   const coveredAreaMax = area.max * coverageMult;
   const costPerSqftMin = matCost.min + LABOR_RATE.min;
   const costPerSqftMax = matCost.max + LABOR_RATE.max;
 
-  let priceMin = coveredAreaMin * costPerSqftMin * stateMult * projAdj;
-  let priceMax = coveredAreaMax * costPerSqftMax * stateMult * projAdj;
+  let singleMin = coveredAreaMin * costPerSqftMin * stateMult * projAdj;
+  let singleMax = coveredAreaMax * costPerSqftMax * stateMult * projAdj;
 
-  // 7. Add-ons
+  // 7. Add-ons (per vehicle)
   const selectedAddons = customization.selectedAddons ?? [];
   for (const addonId of selectedAddons) {
     const addon = ADDONS.find(a => a.id === addonId);
     if (addon) {
-      priceMin += addon.priceMin;
-      priceMax += addon.priceMax;
+      singleMin += addon.priceMin;
+      singleMax += addon.priceMax;
     }
   }
 
-  // 8. Decal minimum floor
+  // 8. Decal minimum floor (per vehicle)
   if (coverage === 'decal') {
-    priceMin = Math.max(priceMin, DECAL_PRICE_FLOOR.min);
-    priceMax = Math.max(priceMax, DECAL_PRICE_FLOOR.max);
+    singleMin = Math.max(singleMin, DECAL_PRICE_FLOOR.min);
+    singleMax = Math.max(singleMax, DECAL_PRICE_FLOOR.max);
+  }
+
+  // 9. Fleet: apply tiered multiplier × vehicle count
+  let priceMin = singleMin;
+  let priceMax = singleMax;
+
+  if (projectType === 'fleet' && fleetSize && fleetSize >= 2) {
+    const fleetMult = getFleetMultiplier(fleetSize);
+    priceMin = singleMin * fleetSize * fleetMult;
+    priceMax = singleMax * fleetSize * fleetMult;
   }
 
   return {
     min: roundTo(Math.max(priceMin, 200), PRICE_ROUND_TO),
     max: roundTo(Math.max(priceMax, 400), PRICE_ROUND_TO),
+    // Expose single-vehicle price for Step 5 breakdown
+    singleMin: projectType === 'fleet' ? roundTo(Math.max(singleMin, 200), PRICE_ROUND_TO) : undefined,
+    singleMax: projectType === 'fleet' ? roundTo(Math.max(singleMax, 400), PRICE_ROUND_TO) : undefined,
   };
 }
 
