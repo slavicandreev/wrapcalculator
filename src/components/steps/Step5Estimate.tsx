@@ -108,6 +108,16 @@ export function Step5Estimate() {
                   {formatPriceRange(priceRange.min, priceRange.max)}
                 </span>
               </div>
+              {/* Fleet per-vehicle breakdown */}
+              {state.projectType === 'fleet' && state.fleetSize && priceRange?.singleMin && (
+                <p className="text-sm text-slate-500 mt-1">
+                  ${priceRange.singleMin.toLocaleString()}–${priceRange.singleMax?.toLocaleString()} per vehicle
+                  &nbsp;·&nbsp;
+                  {state.fleetSize} vehicles
+                  &nbsp;·&nbsp;
+                  {state.fleetSize >= 10 ? '20%' : state.fleetSize >= 5 ? '15%' : '10%'} fleet discount
+                </p>
+              )}
             </div>
           )}
         </div>
