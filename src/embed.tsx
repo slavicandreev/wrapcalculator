@@ -6,17 +6,9 @@ import { createRoot } from 'react-dom/client';
 import { WizardProvider } from './context/WizardContext';
 import { WizardShell } from './components/WizardShell';
 import type { EmbedConfig } from './types';
+import cssText from './index.css?inline';
 
-// CSS is injected as inline string for Shadow DOM isolation (via Vite ?inline)
-// In embed mode, Tailwind CSS will be injected at runtime
-let inlineCss = '';
-try {
-  // This is replaced at build time with the actual CSS string
-  // @ts-expect-error — populated by Vite build
-  inlineCss = __INLINE_CSS__ ?? '';
-} catch {
-  // Fallback: no inline CSS (styles from CDN or parent page)
-}
+const inlineCss = cssText;
 
 class WrapCalculatorWidget extends HTMLElement {
   private _root?: ReturnType<typeof createRoot>;
