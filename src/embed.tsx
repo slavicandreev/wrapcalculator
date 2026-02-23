@@ -6,9 +6,7 @@ import { createRoot } from 'react-dom/client';
 import { WizardProvider } from './context/WizardContext';
 import { WizardShell } from './components/WizardShell';
 import type { EmbedConfig } from './types';
-import cssText from './index.css?inline';
-
-const inlineCss = cssText;
+import inlineCss from './index.css?inline';
 
 class WrapCalculatorWidget extends HTMLElement {
   private _root?: ReturnType<typeof createRoot>;
