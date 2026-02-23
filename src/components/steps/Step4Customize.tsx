@@ -146,7 +146,10 @@ export function Step4Customize() {
           model={vehicle.modelName}
           year={vehicle.year}
           colorHex={selectedColor?.hex ?? null}
+          colorLabel={selectedColor?.label ?? null}
+          colorId={customization.color}
           coverage={customization.coverage}
+          coverageLabel={COVERAGE_OPTIONS.find(c => c.id === customization.coverage)?.label ?? null}
           material={customization.material}
           size="large"
         />
@@ -154,18 +157,6 @@ export function Step4Customize() {
           <p className="text-center text-sm text-slate-500 font-medium">
             {vehicle.year} {vehicle.makeName} {vehicle.modelName}
           </p>
-        )}
-        {selectedColor && (
-          <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedColor.hex }} />
-            <span>{selectedColor.label}</span>
-            {customization.coverage && (
-              <>
-                <span>·</span>
-                <span>{COVERAGE_OPTIONS.find(c => c.id === customization.coverage)?.label}</span>
-              </>
-            )}
-          </div>
         )}
       </div>
     </div>
