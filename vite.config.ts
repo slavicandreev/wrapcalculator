@@ -7,10 +7,6 @@ export default defineConfig(({ mode }) => {
     // Embed build: single IIFE bundle for <script> tag embedding
     return {
       plugins: [react()],
-      define: {
-        // Embed build doesn't use inline CSS injection (simplified)
-        __INLINE_CSS__: JSON.stringify(''),
-      },
       build: {
         lib: {
           entry: 'src/embed.tsx',
