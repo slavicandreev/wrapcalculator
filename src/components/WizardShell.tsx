@@ -36,7 +36,7 @@ export function WizardShell() {
   return (
     <div className="min-h-full flex-1 bg-slate-50 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-slate-100 sticky top-0 z-10">
+      <header className="bg-white border-b border-slate-100">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-between px-6 py-3">
             <div className="flex items-center gap-2">
@@ -61,7 +61,7 @@ export function WizardShell() {
       </main>
 
       {/* Footer: Price + Navigation */}
-      <footer className="bg-white border-t border-slate-100 sticky bottom-0 z-10">
+      <footer className="bg-white border-t border-slate-100">
         <div className="max-w-5xl mx-auto">
           <PriceDisplay />
           <div className="flex items-center justify-between px-6 py-4">
