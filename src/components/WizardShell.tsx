@@ -34,7 +34,7 @@ export function WizardShell() {
   };
 
   return (
-    <div className="min-h-full flex-1 bg-slate-50 flex flex-col">
+    <div className="bg-slate-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-slate-100">
         <div className="max-w-5xl mx-auto">

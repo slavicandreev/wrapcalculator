@@ -13,6 +13,10 @@ class WrapCalculatorWidget extends HTMLElement {
   private _shadowRoot?: ShadowRoot;
 
   connectedCallback() {
+    // Ensure the custom element is block-level and fills its container
+    this.style.display = 'block';
+    this.style.width = '100%';
+
     this._shadowRoot = this.attachShadow({ mode: 'open' });
 
     // Inject styles into shadow root for isolation
@@ -22,8 +26,9 @@ class WrapCalculatorWidget extends HTMLElement {
       this._shadowRoot.appendChild(style);
     }
 
-    // Mount point
+    // Mount point — fill available width
     const container = document.createElement('div');
+    container.style.width = '100%';
     this._shadowRoot.appendChild(container);
 
     // Read config from data attributes
