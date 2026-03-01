@@ -13,9 +13,10 @@ class WrapCalculatorWidget extends HTMLElement {
   private _shadowRoot?: ShadowRoot;
 
   connectedCallback() {
-    // Ensure the custom element is block-level and fills its container
+    // Ensure the custom element is block-level, fills its container, and has a minimum height
     this.style.display = 'block';
     this.style.width = '100%';
+    this.style.minHeight = '700px';
 
     this._shadowRoot = this.attachShadow({ mode: 'open' });
 
