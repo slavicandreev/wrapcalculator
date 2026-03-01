@@ -7,6 +7,9 @@ export default defineConfig(({ mode }) => {
     // Embed build: single IIFE bundle for <script> tag embedding
     return {
       plugins: [react()],
+      define: {
+        'process.env.NODE_ENV': JSON.stringify('production'),
+      },
       build: {
         lib: {
           entry: 'src/embed.tsx',
