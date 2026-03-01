@@ -15,7 +15,7 @@ export function ProgressBar() {
 
   return (
     <div className="w-full px-6 py-4">
-      <div className="flex items-center justify-between max-w-2xl mx-auto">
+      <div className="flex items-center justify-between w-full">
         {STEPS.map((step, idx) => {
           const isCompleted = currentStep > step.num;
           const isActive = currentStep === step.num;

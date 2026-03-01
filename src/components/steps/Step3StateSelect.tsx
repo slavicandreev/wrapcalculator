@@ -27,7 +27,7 @@ export function Step3StateSelect() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="w-full">
       <div className="mb-8">
         <h1 className="text-3xl font-extrabold text-slate-900 mb-2">
           Where are you located?

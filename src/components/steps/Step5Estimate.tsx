@@ -28,7 +28,7 @@ export function Step5Estimate() {
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="w-full">
       {/* Price Hero */}
       <div className="text-center mb-8">
         <p className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-2">

@@ -37,24 +37,13 @@ export function WizardShell() {
     <div className="bg-slate-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-slate-100">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-center justify-between px-6 py-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
-                <span className="text-white text-sm font-bold">W</span>
-              </div>
-              <span className="font-bold text-slate-900 text-lg">WrapCalc</span>
-            </div>
-            <span className="text-xs text-slate-400 font-medium">
-              Step {currentStep} of 5
-            </span>
-          </div>
+        <div className="w-[90%] mx-auto">
           <ProgressBar />
         </div>
       </header>
 
       {/* Step Content */}
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6 sm:px-6">
+      <main className="flex-1 w-[90%] mx-auto px-4 py-6">
         <div className="animate-fade-in">
           <StepComponent />
         </div>
@@ -62,7 +51,7 @@ export function WizardShell() {
 
       {/* Footer: Price + Navigation */}
       <footer className="bg-white border-t border-slate-100">
-        <div className="max-w-5xl mx-auto">
+        <div className="w-[90%] mx-auto">
           <PriceDisplay />
           <div className="flex items-center justify-between px-6 py-4">
             {currentStep > 1 ? (
