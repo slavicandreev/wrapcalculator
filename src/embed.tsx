@@ -27,9 +27,12 @@ class WrapCalculatorWidget extends HTMLElement {
       this._shadowRoot.appendChild(style);
     }
 
-    // Mount point — fill available width
+    // Mount point — fill available width.
+    // font-size: 16px anchors em-based Tailwind sizes so they render correctly
+    // regardless of the host page's html/body font-size (e.g. WordPress 62.5% resets).
     const container = document.createElement('div');
     container.style.width = '100%';
+    container.style.fontSize = '16px';
     this._shadowRoot.appendChild(container);
 
     // Read config from data attributes
