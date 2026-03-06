@@ -2,14 +2,16 @@ export interface AIColorMatch {
   color_name: string;
   series_code: string;
   confidence: number;
-  closest_hex_match?: string;
+  hex_estimate?: string;
+  match_reasoning?: string;
 }
 
 export interface AIAnalysisResult {
   dominant_color_description: string;
-  finish: string;
+  finish_type: string;
+  lighting_context?: string;
   color_properties: {
-    hue: string;
+    hue_angle?: string;
     undertone: string;
     saturation: string;
     brightness: string;

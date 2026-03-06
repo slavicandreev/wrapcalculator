@@ -19,7 +19,35 @@ function validateImageBytes(base64: string, mimeType: string): boolean {
   return false;
 }
 
-const PROMPT = `Analyze the car wrap color in this image. Steps you must follow: 1. Identify the dominant wrap color on the car body. 2. Estimate the color characteristics: - hue - saturation - brightness - undertone 3. Determine the likely finish (gloss, satin, matte, metallic). 4. Compare the color to known vinyl wrap colors from: - Avery Dennison SW900 - 3M 2080 Return the closest matches for BOTH brands. Return the top 3 matches per brand. Use this JSON format exactly: { "dominant_color_description": "", "finish": "", "color_properties": { "hue": "", "undertone": "", "saturation": "", "brightness": "" }, "avery_matches": [ { "color_name": "", "closest_hex_match": "", "series_code": "", "confidence": 0-100 } ], "3m_matches": [ { "color_name": "", "closest_hex_match": "", "series_code": "", "confidence": 0-100 } ] }`;
+const PROMPT = `Act as an expert automotive vinyl wrap specialist. Analyze the car in the provided image to identify its wrap color with high precision.
+### Analysis Requirements:
+1. Environmental Compensation: Account for lighting conditions (e.g., direct sun, shade, artificial light) and color cast from surroundings. Focus on "clean" panels like the hood or doors, avoiding areas with heavy sky reflections or deep shadows.
+2. Color Decomposition: Extract the Hue, Saturation, and Brightness (HSB). Specifically identify the "Undertone" (e.g., Is the grey a blue-grey or a brown-grey?).
+3. Texture & Finish: Distinguish between Gloss, Satin, Matte, Metallic, or Pearlescent. Look for the 'flop'—how the color changes at different angles.
+4. Database Cross-Reference: Compare the extracted data against the 2024-2026 catalogs for:
+   - Avery Dennison Supreme Wrapping Film (SW900)
+   - 3M High Gloss / 2080 Series
+### Constraints:
+- If the image contains multiple lighting conditions, prioritize the color visible in neutral, indirect daylight.
+- If a match is between two similar colors (e.g., 3M Satin Black vs. Dead Matte Black), explain the choice in the description.
+### Output Format (JSON):
+{
+  "dominant_color_description": "Detailed description including the 'flop' or metallic flake presence",
+  "finish_type": "Gloss/Satin/Matte/Metallic/Shift",
+  "lighting_context": "Assessment of the light source in the photo",
+  "color_properties": {
+    "hue_angle": "0-360",
+    "undertone": "",
+    "saturation": "0-100",
+    "brightness": "0-100"
+  },
+  "avery_matches": [
+    { "color_name": "", "series_code": "", "hex_estimate": "", "match_reasoning": "", "confidence": 0-100 }
+  ],
+  "3m_matches": [
+    { "color_name": "", "series_code": "", "hex_estimate": "", "match_reasoning": "", "confidence": 0-100 }
+  ]
+}`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {

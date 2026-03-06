@@ -43,48 +43,55 @@ function searchUrl(seriesCode: string): string {
 }
 
 function MatchRow({ match, rank }: { match: AIColorMatch; rank: number }) {
-  const hex = match.closest_hex_match ?? hexForCode(match.series_code);
+  const hex = match.hex_estimate ?? hexForCode(match.series_code);
   const confidence = normalizeConfidence(match.confidence);
   const style = confidenceStyle(confidence);
 
   return (
-    <div className={`flex items-center gap-3 py-2.5 ${rank < 3 ? 'border-b border-slate-100' : ''}`}>
-      {/* Rank */}
-      <span className="text-xs text-slate-400 w-3 flex-shrink-0">{rank}</span>
+    <div className={`py-2.5 ${rank < 3 ? 'border-b border-slate-100' : ''}`}>
+      <div className="flex items-center gap-3">
+        {/* Rank */}
+        <span className="text-xs text-slate-400 w-3 flex-shrink-0">{rank}</span>
 
-      {/* Swatch */}
-      <div
-        className="w-8 h-8 rounded-full flex-shrink-0 border border-slate-200 shadow-sm"
-        style={{ backgroundColor: hex ?? '#e2e8f0' }}
-        aria-label={match.color_name}
-      />
+        {/* Swatch */}
+        <div
+          className="w-8 h-8 rounded-full flex-shrink-0 border border-slate-200 shadow-sm"
+          style={{ backgroundColor: hex ?? '#e2e8f0' }}
+          aria-label={match.color_name}
+        />
 
-      {/* Name + code + link */}
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-semibold text-slate-800 truncate leading-tight">{match.color_name}</div>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="font-mono text-xs text-slate-400 truncate">{match.series_code}</span>
-          <a
-            href={searchUrl(match.series_code)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-violet-600 hover:text-violet-800 hover:underline whitespace-nowrap flex-shrink-0"
-          >
-            Find →
-          </a>
+        {/* Name + code + link */}
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-semibold text-slate-800 truncate leading-tight">{match.color_name}</div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="font-mono text-xs text-slate-400 truncate">{match.series_code}</span>
+            <a
+              href={searchUrl(match.series_code)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-violet-600 hover:text-violet-800 hover:underline whitespace-nowrap flex-shrink-0"
+            >
+              Find →
+            </a>
+          </div>
+        </div>
+
+        {/* Confidence */}
+        <div className="flex flex-col items-end gap-1 flex-shrink-0 w-14">
+          <span className={`text-xs font-semibold ${style.text}`}>{confidence}%</span>
+          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${style.bar}`}
+              style={{ width: `${Math.min(100, confidence)}%` }}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Confidence */}
-      <div className="flex flex-col items-end gap-1 flex-shrink-0 w-14">
-        <span className={`text-xs font-semibold ${style.text}`}>{confidence}%</span>
-        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${style.bar}`}
-            style={{ width: `${Math.min(100, confidence)}%` }}
-          />
-        </div>
-      </div>
+      {/* Match reasoning */}
+      {match.match_reasoning && (
+        <p className="text-xs text-slate-400 mt-1.5 pl-11 leading-relaxed">{match.match_reasoning}</p>
+      )}
     </div>
   );
 }
@@ -92,7 +99,7 @@ function MatchRow({ match, rank }: { match: AIColorMatch; rank: number }) {
 export function AIAnalysisPanel({ analysis }: AIAnalysisPanelProps) {
   const props = analysis.color_properties;
   const chips = [
-    { label: 'Hue',        value: props.hue        },
+    { label: 'Hue',        value: props.hue_angle ? `${props.hue_angle}°` : null },
     { label: 'Undertone',  value: props.undertone  },
     { label: 'Saturation', value: props.saturation },
     { label: 'Brightness', value: props.brightness },
@@ -104,13 +111,18 @@ export function AIAnalysisPanel({ analysis }: AIAnalysisPanelProps) {
       <div className="bg-violet-50 border border-violet-200 rounded-2xl px-4 py-3 space-y-2">
         <div className="flex items-center gap-2">
           <span className="bg-violet-200 text-violet-800 text-xs font-semibold px-2 py-0.5 rounded-full">AI Analysis</span>
-          {analysis.finish && (
+          {analysis.finish_type && (
             <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full capitalize">
-              {analysis.finish}
+              {analysis.finish_type}
             </span>
           )}
         </div>
         <p className="text-sm text-slate-800 font-medium">{analysis.dominant_color_description}</p>
+
+        {/* Lighting context */}
+        {analysis.lighting_context && (
+          <p className="text-xs text-slate-500 italic">{analysis.lighting_context}</p>
+        )}
 
         {/* Color property chips */}
         {chips.length > 0 && (
