@@ -1,4 +1,5 @@
 export interface AIColorMatch {
+  rank?: number;
   color_name: string;
   series_code: string;
   confidence: number;
@@ -8,10 +9,9 @@ export interface AIColorMatch {
 
 export interface AIAnalysisResult {
   dominant_color_description: string;
-  finish_type: string;
   lighting_context?: string;
   color_properties: {
-    hue_angle?: string;
+    hue?: string;
     undertone: string;
     saturation: string;
     brightness: string;

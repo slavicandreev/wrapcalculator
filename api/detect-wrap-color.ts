@@ -19,33 +19,35 @@ function validateImageBytes(base64: string, mimeType: string): boolean {
   return false;
 }
 
-const PROMPT = `Act as an expert automotive vinyl wrap specialist. Analyze the car in the provided image to identify its wrap color with high precision.
-### Analysis Requirements:
-1. Environmental Compensation: Account for lighting conditions (e.g., direct sun, shade, artificial light) and color cast from surroundings. Focus on "clean" panels like the hood or doors, avoiding areas with heavy sky reflections or deep shadows.
-2. Color Decomposition: Extract the Hue, Saturation, and Brightness (HSB). Specifically identify the "Undertone" (e.g., Is the grey a blue-grey or a brown-grey?).
-3. Texture & Finish: Distinguish between Gloss, Satin, Matte, Metallic, or Pearlescent. Look for the 'flop'—how the color changes at different angles.
-4. Database Cross-Reference: Compare the extracted data against the 2024-2026 catalogs for:
-   - Avery Dennison Supreme Wrapping Film (SW900)
-   - 3M High Gloss / 2080 Series
-### Constraints:
-- If the image contains multiple lighting conditions, prioritize the color visible in neutral, indirect daylight.
-- If a match is between two similar colors (e.g., 3M Satin Black vs. Dead Matte Black), explain the choice in the description.
-### Output Format (JSON):
+const PROMPT = `Act as an expert automotive vinyl wrap specialist. Analyze the car wrap color in the provided image using professional colorimetry standards.
+### Step-by-Step Analysis:
+1. Environment Check: Identify the lighting (Direct Sun, Overcast, Artificial) and compensate for color cast or reflections. Focus on "clean" panels like the hood or side doors.
+2. Color Decomposition: Estimate the HSB (Hue, Saturation, Brightness) and identify the specific undertone (e.g., Cool/Blue-based vs. Warm/Yellow-based).
+3. Texture & Finish: Distinguish between Gloss, Satin, Matte, Metallic, or Pearlescent. Look for the "flop" (how light interacts with the pigment at angles).
+4. Database Cross-Reference: Compare against the 2024-2026 catalogs for Avery Dennison SW900 and 3M 2080/High Gloss series.
+### Requirements:
+- You MUST return exactly 3 matches for Avery Dennison and 3 matches for 3M.
+- Rank them by "Confidence" (0-100).
+- Provide a brief "Match Reasoning" for each to explain why it fits the visual data.
+### JSON Output Format (Strict):
 {
-  "dominant_color_description": "Detailed description including the 'flop' or metallic flake presence",
-  "finish_type": "Gloss/Satin/Matte/Metallic/Shift",
-  "lighting_context": "Assessment of the light source in the photo",
+  "dominant_color_description": "Detailed visual description of the color and finish",
+  "lighting_context": "Assessment of the light source and environment",
   "color_properties": {
-    "hue_angle": "0-360",
+    "hue": "",
     "undertone": "",
-    "saturation": "0-100",
-    "brightness": "0-100"
+    "saturation": "",
+    "brightness": ""
   },
   "avery_matches": [
-    { "color_name": "", "series_code": "", "hex_estimate": "", "match_reasoning": "", "confidence": 0-100 }
+    { "rank": 1, "color_name": "", "series_code": "", "hex_estimate": "", "match_reasoning": "", "confidence": 0 },
+    { "rank": 2, "color_name": "", "series_code": "", "hex_estimate": "", "match_reasoning": "", "confidence": 0 },
+    { "rank": 3, "color_name": "", "series_code": "", "hex_estimate": "", "match_reasoning": "", "confidence": 0 }
   ],
   "3m_matches": [
-    { "color_name": "", "series_code": "", "hex_estimate": "", "match_reasoning": "", "confidence": 0-100 }
+    { "rank": 1, "color_name": "", "series_code": "", "hex_estimate": "", "match_reasoning": "", "confidence": 0 },
+    { "rank": 2, "color_name": "", "series_code": "", "hex_estimate": "", "match_reasoning": "", "confidence": 0 },
+    { "rank": 3, "color_name": "", "series_code": "", "hex_estimate": "", "match_reasoning": "", "confidence": 0 }
   ]
 }`;
 
@@ -87,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       body: JSON.stringify({
         model: 'gpt-4o',
-        max_tokens: 600,
+        max_tokens: 900,
         response_format: { type: 'json_object' },
         messages: [
           {

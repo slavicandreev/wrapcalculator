@@ -99,7 +99,7 @@ function MatchRow({ match, rank }: { match: AIColorMatch; rank: number }) {
 export function AIAnalysisPanel({ analysis }: AIAnalysisPanelProps) {
   const props = analysis.color_properties;
   const chips = [
-    { label: 'Hue',        value: props.hue_angle ? `${props.hue_angle}°` : null },
+    { label: 'Hue',        value: props.hue        },
     { label: 'Undertone',  value: props.undertone  },
     { label: 'Saturation', value: props.saturation },
     { label: 'Brightness', value: props.brightness },
@@ -111,11 +111,6 @@ export function AIAnalysisPanel({ analysis }: AIAnalysisPanelProps) {
       <div className="bg-violet-50 border border-violet-200 rounded-2xl px-4 py-3 space-y-2">
         <div className="flex items-center gap-2">
           <span className="bg-violet-200 text-violet-800 text-xs font-semibold px-2 py-0.5 rounded-full">AI Analysis</span>
-          {analysis.finish_type && (
-            <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full capitalize">
-              {analysis.finish_type}
-            </span>
-          )}
         </div>
         <p className="text-sm text-slate-800 font-medium">{analysis.dominant_color_description}</p>
 
