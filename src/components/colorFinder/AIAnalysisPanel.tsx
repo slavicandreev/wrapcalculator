@@ -5,6 +5,11 @@ interface AIAnalysisPanelProps {
   analysis: AIAnalysisResult;
 }
 
+/** Normalize 0-1 decimals to 0-100 if GPT-4o returns them that way */
+function normalizeConfidence(raw: number): number {
+  return raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
+}
+
 function confidenceStyle(confidence: number): { bar: string; text: string } {
   if (confidence >= 80) return { bar: 'bg-emerald-500', text: 'text-emerald-700' };
   if (confidence >= 60) return { bar: 'bg-brand-500',   text: 'text-brand-700'  };
@@ -25,7 +30,8 @@ function hexForCode(code: string): string | null {
 
 function MatchRow({ match, rank }: { match: AIColorMatch; rank: number }) {
   const hex = hexForCode(match.series_code);
-  const style = confidenceStyle(match.confidence);
+  const confidence = normalizeConfidence(match.confidence);
+  const style = confidenceStyle(confidence);
 
   return (
     <div className={`flex items-center gap-3 py-2.5 ${rank < 3 ? 'border-b border-slate-100' : ''}`}>
@@ -47,11 +53,11 @@ function MatchRow({ match, rank }: { match: AIColorMatch; rank: number }) {
 
       {/* Confidence */}
       <div className="flex flex-col items-end gap-1 flex-shrink-0 w-14">
-        <span className={`text-xs font-semibold ${style.text}`}>{match.confidence}%</span>
+        <span className={`text-xs font-semibold ${style.text}`}>{confidence}%</span>
         <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${style.bar}`}
-            style={{ width: `${Math.min(100, match.confidence)}%` }}
+            style={{ width: `${Math.min(100, confidence)}%` }}
           />
         </div>
       </div>
