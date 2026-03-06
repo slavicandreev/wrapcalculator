@@ -19,45 +19,7 @@ function validateImageBytes(base64: string, mimeType: string): boolean {
   return false;
 }
 
-const PROMPT = `Analyze the car wrap color in this image.
-Steps you must follow:
-1. Identify the dominant wrap color on the car body.
-2. Estimate the color characteristics:
-   - hue
-   - saturation
-   - brightness
-   - undertone
-3. Determine the likely finish (gloss, satin, matte, metallic).
-4. Compare the color to known vinyl wrap colors from:
-   - Avery Dennison SW900
-   - 3M 2080
-Return the closest matches for BOTH brands.
-Return the top 3 matches per brand.
-Use this JSON format exactly:
-{
-  "dominant_color_description": "",
-  "finish": "",
-  "color_properties": {
-    "hue": "",
-    "undertone": "",
-    "saturation": "",
-    "brightness": ""
-  },
-  "avery_matches": [
-    {
-      "color_name": "",
-      "series_code": "",
-      "confidence": 0
-    }
-  ],
-  "3m_matches": [
-    {
-      "color_name": "",
-      "series_code": "",
-      "confidence": 0
-    }
-  ]
-}`;
+const PROMPT = `Analyze the car wrap color in this image. Steps you must follow: 1. Identify the dominant wrap color on the car body. 2. Estimate the color characteristics: - hue - saturation - brightness - undertone 3. Determine the likely finish (gloss, satin, matte, metallic). 4. Compare the color to known vinyl wrap colors from: - Avery Dennison SW900 - 3M 2080 Return the closest matches for BOTH brands. Return the top 3 matches per brand. Use this JSON format exactly: { "dominant_color_description": "", "finish": "", "color_properties": { "hue": "", "undertone": "", "saturation": "", "brightness": "" }, "avery_matches": [ { "color_name": "", "closest_hex_match": "", "series_code": "", "confidence": 0-100 } ], "3m_matches": [ { "color_name": "", "closest_hex_match": "", "series_code": "", "confidence": 0-100 } ] }`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {

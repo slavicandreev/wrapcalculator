@@ -2,6 +2,7 @@ export interface AIColorMatch {
   color_name: string;
   series_code: string;
   confidence: number;
+  closest_hex_match?: string;
 }
 
 export interface AIAnalysisResult {

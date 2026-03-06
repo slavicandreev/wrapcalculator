@@ -20,16 +20,30 @@ function confidenceStyle(confidence: number): { bar: string; text: string } {
 /** Try to find a hex swatch from our local DB by series code */
 function hexForCode(code: string): string | null {
   if (!code) return null;
-  const normalized = code.toLowerCase().replace(/\s/g, '');
-  const found = ALL_WRAP_SKUS.find(s =>
-    s.sku.toLowerCase().replace(/\s/g, '') === normalized ||
-    normalized.includes(s.sku.toLowerCase().replace(/\s/g, ''))
+  const norm = (s: string) => s.toLowerCase().replace(/\s/g, '');
+  const normalized = norm(code);
+
+  // Direct match
+  const direct = ALL_WRAP_SKUS.find(s => {
+    const sku = norm(s.sku);
+    return sku === normalized || normalized.includes(sku);
+  });
+  if (direct) return direct.hex;
+
+  // Strip leading numeric series prefix so GPT's "2080-G47" matches our "1080-G47"
+  const stripPrefix = normalized.replace(/^\d{3,4}-/, '');
+  const byVariant = ALL_WRAP_SKUS.find(s =>
+    norm(s.sku).replace(/^\d{3,4}-/, '') === stripPrefix
   );
-  return found?.hex ?? null;
+  return byVariant?.hex ?? null;
+}
+
+function searchUrl(seriesCode: string): string {
+  return `https://www.wrapfilm.com/search?q=${encodeURIComponent(seriesCode)}`;
 }
 
 function MatchRow({ match, rank }: { match: AIColorMatch; rank: number }) {
-  const hex = hexForCode(match.series_code);
+  const hex = match.closest_hex_match ?? hexForCode(match.series_code);
   const confidence = normalizeConfidence(match.confidence);
   const style = confidenceStyle(confidence);
 
@@ -45,10 +59,20 @@ function MatchRow({ match, rank }: { match: AIColorMatch; rank: number }) {
         aria-label={match.color_name}
       />
 
-      {/* Name + code */}
+      {/* Name + code + link */}
       <div className="flex-1 min-w-0">
         <div className="text-xs font-semibold text-slate-800 truncate leading-tight">{match.color_name}</div>
-        <div className="font-mono text-xs text-slate-400 mt-0.5 truncate">{match.series_code}</div>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="font-mono text-xs text-slate-400 truncate">{match.series_code}</span>
+          <a
+            href={searchUrl(match.series_code)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-violet-600 hover:text-violet-800 hover:underline whitespace-nowrap flex-shrink-0"
+          >
+            Find →
+          </a>
+        </div>
       </div>
 
       {/* Confidence */}
