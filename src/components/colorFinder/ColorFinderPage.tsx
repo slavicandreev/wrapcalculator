@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { extractDominantLab, matchColor, reorderByAI } from '../../utils/colorMatcher';
+import { extractDominantLab, matchColor } from '../../utils/colorMatcher';
 import { ALL_WRAP_SKUS } from '../../data/wrapSkus';
 import type { SkuMatch } from '../../data/wrapSkus';
+import type { AIAnalysisResult } from './types';
 import { ImageUploadZone } from './ImageUploadZone';
 import { ColorPreviewBar } from './ColorPreviewBar';
 import { ResultsGrid } from './ResultsGrid';
@@ -10,7 +11,7 @@ type PagePhase =
   | { status: 'idle' }
   | { status: 'results'; extractedLab: [number, number, number]; matches: SkuMatch[]; aiError?: boolean }
   | { status: 'refining'; extractedLab: [number, number, number]; matches: SkuMatch[] }
-  | { status: 'ai-results'; extractedLab: [number, number, number]; matches: SkuMatch[]; aiDescription: string };
+  | { status: 'ai-results'; extractedLab: [number, number, number]; matches: SkuMatch[]; aiAnalysis: AIAnalysisResult };
 
 interface ColorFinderPageProps {
   onBack: () => void;
@@ -32,9 +33,9 @@ export function ColorFinderPage({ onBack }: ColorFinderPageProps) {
     setUploadedDataUrl(null);
   };
 
-  const handleRefineWithAI = async () => {
+  const handleAnalyzeWithAI = async () => {
     if ((phase.status !== 'results' && phase.status !== 'ai-results') || !uploadedDataUrl) return;
-    const currentMatches = phase.status === 'results' ? phase.matches : phase.matches;
+    const currentMatches = phase.matches;
     const currentLab = phase.extractedLab;
 
     setPhase({ status: 'refining', extractedLab: currentLab, matches: currentMatches });
@@ -46,37 +47,16 @@ export function ColorFinderPage({ onBack }: ColorFinderPageProps) {
       const res = await fetch('/api/detect-wrap-color', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: base64,
-          mimeType,
-          topCandidates: currentMatches.map(m => ({
-            sku: m.sku.sku,
-            name: m.sku.name,
-            brand: m.sku.brand,
-            hex: m.sku.hex,
-            deltaE: m.deltaE,
-          })),
-        }),
+        body: JSON.stringify({ imageBase64: base64, mimeType }),
       });
 
       if (!res.ok) throw new Error(`${res.status}`);
 
-      const data = await res.json() as { rankedSkus: string[]; aiColorDescription: string };
-      const reordered = reorderByAI(currentMatches, data.rankedSkus);
+      const aiAnalysis = await res.json() as AIAnalysisResult;
 
-      setPhase({
-        status: 'ai-results',
-        extractedLab: currentLab,
-        matches: reordered,
-        aiDescription: data.aiColorDescription,
-      });
+      setPhase({ status: 'ai-results', extractedLab: currentLab, matches: currentMatches, aiAnalysis });
     } catch {
-      setPhase({
-        status: 'results',
-        extractedLab: currentLab,
-        matches: currentMatches,
-        aiError: true,
-      });
+      setPhase({ status: 'results', extractedLab: currentLab, matches: currentMatches, aiError: true });
     }
   };
 
@@ -104,20 +84,17 @@ export function ColorFinderPage({ onBack }: ColorFinderPageProps) {
 
       {/* Main content */}
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-        {/* Intro — only shown when idle */}
         {phase.status === 'idle' && (
           <div className="space-y-1">
             <h2 className="text-xl font-bold text-slate-900">What color is that wrap?</h2>
             <p className="text-sm text-slate-500">
-              Upload a car photo to match its color against 3M 1080 and Avery SW900 vinyl wrap SKUs.
+              Upload a car photo to identify the wrap color and match it against 3M 2080 and Avery SW900 SKUs.
             </p>
-
-            {/* How it works */}
             <div className="grid grid-cols-3 gap-3 pt-4">
               {[
-                { n: '1', label: 'Upload a photo', desc: 'Any car photo — cropped to the body works best' },
-                { n: '2', label: 'We extract the color', desc: 'Canvas API reads dominant pixels, converts to Lab color space' },
-                { n: '3', label: 'Find your wrap', desc: 'Delta-E 2000 matches against 100+ manufacturer SKUs' },
+                { n: '1', label: 'Upload a photo',      desc: 'Any car photo — cropped to the body works best' },
+                { n: '2', label: 'Pixel color match',   desc: 'Canvas API extracts dominant color, Delta-E 2000 finds closest SKUs' },
+                { n: '3', label: 'AI deep analysis',    desc: 'GPT-4o identifies hue, finish, and returns confidence scores per brand' },
               ].map(step => (
                 <div key={step.n} className="bg-white border border-slate-200 rounded-2xl p-4 text-center">
                   <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-700 font-bold text-sm flex items-center justify-center mx-auto mb-2">
@@ -131,15 +108,10 @@ export function ColorFinderPage({ onBack }: ColorFinderPageProps) {
           </div>
         )}
 
-        {/* Upload zone — always shown unless we have results */}
-        {!showResults && (
-          <ImageUploadZone onImageLoaded={handleImageLoaded} />
-        )}
+        {!showResults && <ImageUploadZone onImageLoaded={handleImageLoaded} />}
 
-        {/* Results area */}
         {showResults && (
           <>
-            {/* Thumbnail + extracted color */}
             <div className="flex gap-3 items-start flex-wrap sm:flex-nowrap">
               {uploadedDataUrl && (
                 <img
@@ -149,24 +121,20 @@ export function ColorFinderPage({ onBack }: ColorFinderPageProps) {
                 />
               )}
               <div className="flex-1 min-w-0">
-                <ColorPreviewBar
-                  extractedLab={phase.extractedLab}
-                  onReset={handleReset}
-                />
+                <ColorPreviewBar extractedLab={phase.extractedLab} onReset={handleReset} />
               </div>
             </div>
 
             <ResultsGrid
               matches={phase.matches}
               isRefining={phase.status === 'refining'}
-              aiDescription={phase.status === 'ai-results' ? phase.aiDescription : undefined}
+              aiAnalysis={phase.status === 'ai-results' ? phase.aiAnalysis : undefined}
               aiError={phase.status === 'results' ? phase.aiError : undefined}
-              onRefineWithAI={handleRefineWithAI}
+              onRefineWithAI={handleAnalyzeWithAI}
             />
           </>
         )}
 
-        {/* Footer disclaimer */}
         <p className="text-xs text-slate-400 border-t border-slate-200 pt-4">
           Color matching is approximate. Results depend on photo lighting and camera calibration.
           SKU numbers should be verified against current manufacturer catalogs.

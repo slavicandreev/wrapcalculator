@@ -1,38 +1,63 @@
 // api/detect-wrap-color.ts
-// Vercel serverless function — GPT-4o Vision color matching refinement
+// Vercel serverless function — GPT-4o Vision wrap color identification
 // Keeps OPENAI_API_KEY server-side only
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-interface Candidate {
-  sku: string;
-  name: string;
-  brand: string;
-  hex: string;
-  deltaE: number;
-}
-
 interface RequestPayload {
   imageBase64: string;
   mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
-  topCandidates: Candidate[];
-}
-
-interface OpenAIResponse {
-  rankedSkus: string[];
-  colorDescription: string;
 }
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-// Magic bytes for supported image formats
 function validateImageBytes(base64: string, mimeType: string): boolean {
   const bytes = Buffer.from(base64.substring(0, 16), 'base64');
   if (mimeType === 'image/jpeg') return bytes[0] === 0xff && bytes[1] === 0xd8;
   if (mimeType === 'image/png')  return bytes[0] === 0x89 && bytes[1] === 0x50;
-  if (mimeType === 'image/webp') return bytes[8] === 0x57 && bytes[9] === 0x45; // "WE" in WEBP header
+  if (mimeType === 'image/webp') return bytes[8] === 0x57 && bytes[9] === 0x45;
   return false;
 }
+
+const PROMPT = `Analyze the car wrap color in this image.
+Steps you must follow:
+1. Identify the dominant wrap color on the car body.
+2. Estimate the color characteristics:
+   - hue
+   - saturation
+   - brightness
+   - undertone
+3. Determine the likely finish (gloss, satin, matte, metallic).
+4. Compare the color to known vinyl wrap colors from:
+   - Avery Dennison SW900
+   - 3M 2080
+Return the closest matches for BOTH brands.
+Return the top 3 matches per brand.
+Use this JSON format exactly:
+{
+  "dominant_color_description": "",
+  "finish": "",
+  "color_properties": {
+    "hue": "",
+    "undertone": "",
+    "saturation": "",
+    "brightness": ""
+  },
+  "avery_matches": [
+    {
+      "color_name": "",
+      "series_code": "",
+      "confidence": 0
+    }
+  ],
+  "3m_matches": [
+    {
+      "color_name": "",
+      "series_code": "",
+      "confidence": 0
+    }
+  ]
+}`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -41,12 +66,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return res.status(503).json({ error: 'AI refinement not configured' });
+    return res.status(503).json({ error: 'AI analysis not configured' });
   }
 
-  const { imageBase64, mimeType, topCandidates } = req.body as RequestPayload;
+  const { imageBase64, mimeType } = req.body as RequestPayload;
 
-  if (!imageBase64 || !mimeType || !topCandidates?.length) {
+  if (!imageBase64 || !mimeType) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
@@ -63,27 +88,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Invalid image data' });
   }
 
-  const candidateList = topCandidates
-    .map((c, i) => `${i + 1}. [${c.brand} ${c.sku}] ${c.name} (hex: ${c.hex})`)
-    .join('\n');
-
-  const prompt = `You are a professional automotive vinyl wrap color consultant.
-
-Look at the car in this image and analyze its body color carefully.
-
-Then, from the following vinyl wrap products, rank the top 3 that most closely match the actual car body color. Focus on hue and tone — ignore finish type (gloss/matte) since that cannot be determined from a photo.
-
-Candidates:
-${candidateList}
-
-Respond ONLY with a JSON object in this exact format:
-{
-  "colorDescription": "Brief description of the car's color (e.g. 'deep navy blue with slight metallic shimmer')",
-  "rankedSkus": ["SKU1", "SKU2", "SKU3"]
-}
-
-Use only the exact SKU codes from the candidate list above.`;
-
   try {
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -93,7 +97,7 @@ Use only the exact SKU codes from the candidate list above.`;
       },
       body: JSON.stringify({
         model: 'gpt-4o',
-        max_tokens: 200,
+        max_tokens: 600,
         response_format: { type: 'json_object' },
         messages: [
           {
@@ -103,12 +107,12 @@ Use only the exact SKU codes from the candidate list above.`;
                 type: 'image_url',
                 image_url: {
                   url: `data:${mimeType};base64,${imageBase64}`,
-                  detail: 'low', // ~85 tokens — sufficient for color identification
+                  detail: 'low',
                 },
               },
               {
                 type: 'text',
-                text: prompt,
+                text: PROMPT,
               },
             ],
           },
@@ -131,16 +135,8 @@ Use only the exact SKU codes from the candidate list above.`;
       return res.status(502).json({ error: 'Empty AI response' });
     }
 
-    const parsed = JSON.parse(content) as OpenAIResponse;
-
-    // Validate that returned SKUs exist in the candidate list
-    const validSkus = topCandidates.map(c => c.sku);
-    const safeRanked = (parsed.rankedSkus ?? []).filter(s => validSkus.includes(s));
-
-    return res.status(200).json({
-      rankedSkus: safeRanked,
-      aiColorDescription: parsed.colorDescription ?? '',
-    });
+    const parsed = JSON.parse(content);
+    return res.status(200).json(parsed);
   } catch (err) {
     console.error('detect-wrap-color error:', err);
     return res.status(500).json({ error: 'Internal server error' });
