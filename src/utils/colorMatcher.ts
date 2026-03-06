@@ -158,16 +158,93 @@ export function deltaE2000(
   );
 }
 
-// ─── Dominant color extraction ────────────────────────────────────────────────
+// ─── Dominant color extraction via k-means clustering ─────────────────────────
 
-const MAX_DIM = 200; // Downscale to keep extraction fast
+const MAX_DIM = 200;     // Downscale for speed
+const K = 4;             // Clusters: body color, trim/chrome, glass, shadows
+const MAX_ITER = 20;     // Converges well within this for color data
+const MAX_SAMPLES = 800; // Cap pixel count fed to k-means
+
+type Lab = [number, number, number];
+
+function labDistSq(a: Lab, b: Lab): number {
+  return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+}
 
 /**
- * Extracts the dominant Lab color from an image element.
- * Samples the center 50% of the image to avoid backgrounds and shadows.
- * Skips near-white (L>92) and near-black (L<8) pixels which are usually sky/ground.
+ * k-means++ initialization: spreads initial centroids across the color space
+ * to avoid the degenerate case where multiple centroids land in the same cluster.
  */
-export function extractDominantLab(img: HTMLImageElement): [number, number, number] {
+function kMeansPlusPlus(pixels: Lab[], k: number): Lab[] {
+  const centroids: Lab[] = [pixels[Math.floor(Math.random() * pixels.length)]];
+
+  while (centroids.length < k) {
+    const dists = pixels.map(p => Math.min(...centroids.map(c => labDistSq(p, c))));
+    const total = dists.reduce((s, d) => s + d, 0);
+    let r = Math.random() * total;
+    let picked = pixels[pixels.length - 1];
+    for (let i = 0; i < pixels.length; i++) {
+      r -= dists[i];
+      if (r <= 0) { picked = pixels[i]; break; }
+    }
+    centroids.push(picked);
+  }
+
+  return centroids;
+}
+
+/**
+ * Runs k-means in Lab space and returns the centroid of the largest cluster.
+ * The largest cluster is almost always the car body color — trim, glass, and
+ * shadows form smaller distinct clusters that get separated out.
+ */
+function kMeansLargestCluster(pixels: Lab[]): Lab {
+  if (pixels.length === 0) return [50, 0, 0];
+  if (pixels.length <= K) return pixels[0];
+
+  const centroids = kMeansPlusPlus(pixels, K);
+  const assignments = new Int32Array(pixels.length);
+
+  for (let iter = 0; iter < MAX_ITER; iter++) {
+    let changed = false;
+
+    // Assign each pixel to nearest centroid
+    for (let i = 0; i < pixels.length; i++) {
+      let minD = Infinity, nearest = 0;
+      for (let j = 0; j < K; j++) {
+        const d = labDistSq(pixels[i], centroids[j]);
+        if (d < minD) { minD = d; nearest = j; }
+      }
+      if (assignments[i] !== nearest) { assignments[i] = nearest; changed = true; }
+    }
+
+    if (!changed) break;
+
+    // Recompute centroids
+    for (let j = 0; j < K; j++) {
+      let sL = 0, sA = 0, sB = 0, n = 0;
+      for (let i = 0; i < pixels.length; i++) {
+        if (assignments[i] !== j) continue;
+        sL += pixels[i][0]; sA += pixels[i][1]; sB += pixels[i][2]; n++;
+      }
+      if (n > 0) centroids[j] = [sL / n, sA / n, sB / n];
+    }
+  }
+
+  // Pick the largest cluster
+  const counts = new Int32Array(K);
+  for (let i = 0; i < pixels.length; i++) counts[assignments[i]]++;
+  let best = 0;
+  for (let j = 1; j < K; j++) if (counts[j] > counts[best]) best = j;
+  return centroids[best];
+}
+
+/**
+ * Extracts the dominant car body Lab color using k-means clustering.
+ * Samples the center 50% of the image, skips near-white/near-black pixels,
+ * then clusters into K groups and returns the centroid of the largest cluster.
+ */
+export function extractDominantLab(img: HTMLImageElement): Lab {
   const scale = Math.min(1, MAX_DIM / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
   const w = Math.max(1, Math.round((img.naturalWidth || img.width) * scale));
   const h = Math.max(1, Math.round((img.naturalHeight || img.height) * scale));
@@ -179,7 +256,7 @@ export function extractDominantLab(img: HTMLImageElement): [number, number, numb
   if (!ctx) throw new Error('Canvas 2D context unavailable');
   ctx.drawImage(img, 0, 0, w, h);
 
-  // Sample center 50%
+  // Read center 50% region
   const margin = 0.25;
   const x0 = Math.floor(w * margin);
   const y0 = Math.floor(h * margin);
@@ -187,30 +264,25 @@ export function extractDominantLab(img: HTMLImageElement): [number, number, numb
   const sh = Math.max(1, Math.floor(h * 0.5));
   const { data } = ctx.getImageData(x0, y0, sw, sh);
 
-  let sumL = 0, sumA = 0, sumB = 0, count = 0;
-  for (let i = 0; i < data.length; i += 4) {
+  // Collect candidate pixels, subsampled to MAX_SAMPLES
+  const totalPixels = sw * sh;
+  const step = Math.max(1, Math.ceil(totalPixels / MAX_SAMPLES));
+  const candidates: Lab[] = [];
+
+  for (let i = 0; i < data.length; i += 4 * step) {
     const lab = sRGBToLab(data[i], data[i + 1], data[i + 2]);
-    if (lab[0] > 92 || lab[0] < 8) continue; // skip background/shadow
-    sumL += lab[0];
-    sumA += lab[1];
-    sumB += lab[2];
-    count++;
+    if (lab[0] > 92 || lab[0] < 8) continue; // skip sky/shadow
+    candidates.push(lab);
   }
 
-  if (count === 0) {
-    // Fallback: use all pixels (very dark/light cars)
-    for (let i = 0; i < data.length; i += 4) {
-      const lab = sRGBToLab(data[i], data[i + 1], data[i + 2]);
-      sumL += lab[0];
-      sumA += lab[1];
-      sumB += lab[2];
-      count++;
+  // Fallback: if all pixels were filtered (very dark/light car), use them all
+  if (candidates.length < K) {
+    for (let i = 0; i < data.length; i += 4 * step) {
+      candidates.push(sRGBToLab(data[i], data[i + 1], data[i + 2]));
     }
   }
 
-  return count > 0
-    ? [sumL / count, sumA / count, sumB / count]
-    : [50, 0, 0]; // neutral gray ultimate fallback
+  return kMeansLargestCluster(candidates);
 }
 
 // ─── Matching ─────────────────────────────────────────────────────────────────
