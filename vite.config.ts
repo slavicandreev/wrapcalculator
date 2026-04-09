@@ -33,6 +33,35 @@ export default defineConfig(({ mode }) => {
     };
   }
 
+  if (mode === 'wordpress') {
+    // WordPress plugin build: single IIFE bundle for [wrap_calculator] shortcode
+    return {
+      plugins: [react()],
+      define: {
+        'process.env.NODE_ENV': JSON.stringify('production'),
+      },
+      build: {
+        lib: {
+          entry: 'src/wordpress-entry.tsx',
+          name: 'WrapMatchPro',
+          fileName: 'wrapmatchpro',
+          formats: ['iife'],
+        },
+        rollupOptions: {
+          external: [],
+          output: {
+            dir: 'wordpress-plugin/wrapmatchpro/assets/js',
+            entryFileNames: 'wrapmatchpro.js',
+          },
+        },
+        outDir: 'wordpress-plugin/wrapmatchpro/assets/js',
+        emptyOutDir: false,
+        copyPublicDir: false,
+        minify: true,
+      },
+    };
+  }
+
   // Default: standard SPA build
   return {
     plugins: [react()],

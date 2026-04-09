@@ -4,6 +4,7 @@ import type { WizardState, PriceRange } from '../types';
 import { buildImagineUrl } from '../services/imaginApi';
 import { getColorById } from '../data/colors';
 import { ADDONS } from '../data/addons';
+import { apiPost } from '../utils/api';
 
 interface QuoteFormModalProps {
   isOpen: boolean;
@@ -95,40 +96,31 @@ export function QuoteFormModal({ isOpen, onClose, wizardState, priceRange }: Quo
         carPhotoMimeType = result.mimeType;
       }
 
-      const res = await fetch('/api/send-quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
-          timeline,
-          sendAiPreview,
-          projectType,
-          vehicle: {
-            year: vehicle.year,
-            makeName: vehicle.makeName,
-            modelName: vehicle.modelName,
-            trim: vehicle.trim,
-          },
-          stateCode,
-          material: customization.material,
-          colorLabel: selectedColor?.label ?? null,
-          colorHex: selectedColor?.hex ?? null,
-          coverage: customization.coverage,
-          addons: selectedAddons,
-          priceMin: priceRange?.min ?? null,
-          priceMax: priceRange?.max ?? null,
-          imageUrl,
-          notes: notes.trim() || null,
-          carPhotoBase64,
-          carPhotoMimeType,
-        }),
+      await apiPost('/submit-quote', {
+        name: name.trim(),
+        email: email.trim(),
+        timeline,
+        sendAiPreview,
+        projectType,
+        vehicle: {
+          year: vehicle.year,
+          makeName: vehicle.makeName,
+          modelName: vehicle.modelName,
+          trim: vehicle.trim,
+        },
+        stateCode,
+        material: customization.material,
+        colorLabel: selectedColor?.label ?? null,
+        colorHex: selectedColor?.hex ?? null,
+        coverage: customization.coverage,
+        addons: selectedAddons,
+        priceMin: priceRange?.min ?? null,
+        priceMax: priceRange?.max ?? null,
+        imageUrl,
+        notes: notes.trim() || null,
+        carPhotoBase64,
+        carPhotoMimeType,
       });
-
-      if (!res.ok) {
-        const data = await res.json() as { error?: string };
-        throw new Error(data.error ?? 'Submission failed');
-      }
 
       setSubmitted(true);
     } catch (err) {

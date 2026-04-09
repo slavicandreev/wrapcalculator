@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AIAnalysisResult } from './types';
 import { ImageUploadZone } from './ImageUploadZone';
 import { AIAnalysisPanel } from './AIAnalysisPanel';
+import { apiPost } from '../../utils/api';
 
 type PagePhase =
   | { status: 'idle' }
@@ -23,18 +24,10 @@ export function ColorFinderPage({ onBack }: ColorFinderPageProps) {
       const [meta, base64] = dataUrl.split(',');
       const mimeType = meta.split(';')[0].split(':')[1] as 'image/jpeg' | 'image/png' | 'image/webp';
 
-      const res = await fetch('/api/detect-wrap-color', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, mimeType }),
+      const aiAnalysis = await apiPost<AIAnalysisResult>('/detect-color', {
+        imageBase64: base64,
+        mimeType,
       });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(err.error ?? `Server error ${res.status}`);
-      }
-
-      const aiAnalysis = await res.json() as AIAnalysisResult;
       setPhase({ status: 'results', dataUrl, aiAnalysis });
     } catch (err) {
       setPhase({

@@ -11,6 +11,8 @@
     "build": "tsc -b && vite build && vite build --mode embed",
     "build:app": "tsc -b && vite build",
     "build:embed": "vite build --mode embed",
+    "build:wordpress": "vite build --mode wordpress",
+    "build:wp-dist": "npm run build:wordpress && cd wordpress-plugin && zip -r ../wrapmatchpro.zip wrapmatchpro/",
     "lint": "eslint .",
     "preview": "vite preview"
   },
