@@ -10,7 +10,7 @@ export async function fetchTrims(make: string, model: string, year: number): Pro
   if (trimsCache.has(cacheKey)) return trimsCache.get(cacheKey)!;
 
   try {
-    const url = `${CARAPI_BASE}/trims?year=${year}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&limit=50`;
+    const url = `${CARAPI_BASE}/trims/v2?year=${year}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&limit=50`;
     const res = await fetch(url);
     if (!res.ok) return [];
 
@@ -33,15 +33,5 @@ export async function fetchTrims(make: string, model: string, year: number): Pro
   }
 }
 
-export async function fetchBodyStyle(make: string, model: string, year: number): Promise<string | null> {
-  try {
-    const url = `${CARAPI_BASE}/trims?year=${year}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&limit=1`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    return data.data?.[0]?.body_style ?? null;
-  } catch {
-    return null;
-  }
-}
+// v2 API no longer returns body_style — body class is now resolved
+// entirely via NHTSA heuristics in Step2VehicleSelect.

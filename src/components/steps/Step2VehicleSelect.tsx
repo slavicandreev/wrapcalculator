@@ -3,8 +3,8 @@ import { useWizard } from '../../context/WizardContext';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { CarVisualization } from '../visualization/CarVisualization';
 import { fetchAllMakes, fetchModelsForMake, guessBodyClassFromModel } from '../../services/nhtsaApi';
-import { fetchTrims, fetchBodyStyle } from '../../services/carApi';
-import { normalizeBodyClass } from '../../data/vehicleAreas';
+import { fetchTrims } from '../../services/carApi';
+// Body class is resolved via heuristics in guessBodyClassFromModel
 import { MANUAL_BODY_TYPES } from '../../data/vehicleAreas';
 import type { VehicleMake, VehicleModel } from '../../types';
 
@@ -89,18 +89,11 @@ export function Step2VehicleSelect() {
     }
 
     try {
-      const [trimData, bodyStyleRaw] = await Promise.all([
-        fetchTrims(vehicle.makeName, vehicle.modelName, vehicle.year),
-        fetchBodyStyle(vehicle.makeName, vehicle.modelName, vehicle.year),
-      ]);
+      const trimData = await fetchTrims(vehicle.makeName, vehicle.modelName, vehicle.year);
       setTrims(trimData);
 
-      // CarAPI body style overrides heuristic when available
-      if (bodyStyleRaw) {
-        const normalized = normalizeBodyClass(bodyStyleRaw);
-        dispatch({ type: 'SET_VEHICLE', payload: { bodyClass: normalized } });
-      } else if (!guessed) {
-        // Final fallback: default to Sedan
+      // If heuristic didn't match, default to Sedan
+      if (!guessed) {
         dispatch({ type: 'SET_VEHICLE', payload: { bodyClass: 'Sedan' } });
       }
     } catch {
