@@ -43,17 +43,6 @@ export interface StateData {
   region: 'northeast' | 'southeast' | 'midwest' | 'southwest' | 'west';
 }
 
-// ─── Vehicle ──────────────────────────────────────────────────────────────────
-export interface VehicleMake {
-  makeId: number;
-  makeName: string;
-}
-
-export interface VehicleModel {
-  modelId: number;
-  modelName: string;
-}
-
 // ─── Wizard State ─────────────────────────────────────────────────────────────
 export interface WizardVehicle {
   makeId: string | null;

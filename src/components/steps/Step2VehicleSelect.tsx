@@ -1,46 +1,52 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useWizard } from '../../context/WizardContext';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { CarVisualization } from '../visualization/CarVisualization';
-import { fetchAllMakes, fetchModelsForMake, guessBodyClassFromModel } from '../../services/nhtsaApi';
-import { fetchTrims } from '../../services/carApi';
-// Body class is resolved via heuristics in guessBodyClassFromModel
+import { fetchMakes, fetchModels, guessBodyClassFromModel } from '../../services/vehicleApi';
 import { MANUAL_BODY_TYPES } from '../../data/vehicleAreas';
-import type { VehicleMake, VehicleModel } from '../../types';
 
 const FLEET_SIZE_OPTIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50];
 
-const CURRENT_YEAR = new Date().getFullYear();
+const CURRENT_YEAR = new Date().getFullYear() + 1; // include next model year
 const YEARS = Array.from({ length: CURRENT_YEAR - 1989 }, (_, i) => CURRENT_YEAR - i);
 
-// Popular makes sorted first (compared case-insensitively since NHTSA returns ALL CAPS)
-const POPULAR_MAKES_UPPER = ['TOYOTA', 'HONDA', 'FORD', 'CHEVROLET', 'BMW', 'MERCEDES-BENZ', 'AUDI', 'TESLA', 'DODGE', 'JEEP', 'RAM', 'GMC', 'NISSAN', 'HYUNDAI', 'KIA', 'SUBARU', 'VOLKSWAGEN', 'LEXUS', 'ACURA', 'INFINITI', 'CADILLAC', 'LINCOLN', 'BUICK'];
+// Popular makes sorted first
+const POPULAR_MAKES = ['Toyota', 'Honda', 'Ford', 'Chevrolet', 'BMW', 'Mercedes-Benz', 'Audi', 'Tesla', 'Dodge', 'Jeep', 'Ram', 'GMC', 'Nissan', 'Hyundai', 'Kia', 'Subaru', 'Volkswagen', 'Lexus', 'Acura', 'Infiniti', 'Cadillac', 'Lincoln', 'Buick'];
 
-// Convert "TOYOTA" → "Toyota", "BMW" → "BMW" (keep short all-caps as-is)
-function toTitleCase(str: string): string {
-  return str
-    .split(/[\s-]/)
-    .map(w => w.length <= 3 ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(str.includes('-') ? '-' : ' ');
-}
-
-function sortMakes(makes: VehicleMake[]): VehicleMake[] {
-  // Normalize display names and sort popular ones first
-  const normalized = makes.map(m => ({
-    ...m,
-    makeName: toTitleCase(m.makeName),
-  }));
-
-  return normalized.sort((a, b) => {
-    const aUpper = a.makeName.toUpperCase();
-    const bUpper = b.makeName.toUpperCase();
-    const aIdx = POPULAR_MAKES_UPPER.indexOf(aUpper);
-    const bIdx = POPULAR_MAKES_UPPER.indexOf(bUpper);
+function sortMakes(makes: string[]): string[] {
+  return makes.sort((a, b) => {
+    const aIdx = POPULAR_MAKES.indexOf(a);
+    const bIdx = POPULAR_MAKES.indexOf(b);
     if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
     if (aIdx !== -1) return -1;
     if (bIdx !== -1) return 1;
-    return a.makeName.localeCompare(b.makeName);
+    return a.localeCompare(b);
   });
+}
+
+/**
+ * Extract the base model name from fueleconomy.gov's detailed model string.
+ * e.g. "Accord Sport/Touring" → "Accord", "X5 xDrive40i" → "X5"
+ * Groups models so user picks base model first, then a trim variant.
+ */
+function extractBaseModel(fullModel: string): string {
+  // Split on first space that's followed by a lowercase letter, digit,
+  // or known trim prefix — but keep multi-word base models like "Model 3", "Land Cruiser"
+  const knownMultiWord = /^(Model [3SXY]|Grand Cherokee|Land Cruiser|Town Car|Crown Victoria|Monte Carlo|Grand Prix|Gran Coupe|El Camino|New Yorker)/i;
+  const match = fullModel.match(knownMultiWord);
+  if (match) return match[1];
+
+  // For most cars: first word (or first word + number) is the model
+  const parts = fullModel.split(/\s+/);
+  if (parts.length === 1) return fullModel;
+
+  // Keep "CR-V", "CX-5" style compound names
+  if (/^[A-Z]{1,3}-?\d/.test(parts[0])) return parts[0];
+
+  // If second part starts with a digit, it's still the model name (e.g. "3 Series", "5 Series")
+  if (parts.length >= 2 && /^\d/.test(parts[1])) return `${parts[0]} ${parts[1]}`;
+
+  return parts[0];
 }
 
 export function Step2VehicleSelect() {
@@ -49,61 +55,56 @@ export function Step2VehicleSelect() {
   const isFleet = state.projectType === 'fleet';
   const fleetSize = state.fleetSize ?? 2;
 
-  const [makes, setMakes] = useState<VehicleMake[]>([]);
-  const [models, setModels] = useState<VehicleModel[]>([]);
-  const [trims, setTrims] = useState<string[]>([]);
+  const [makes, setMakes] = useState<string[]>([]);
+  const [allModels, setAllModels] = useState<string[]>([]); // raw from API
   const [loadingMakes, setLoadingMakes] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
   const [apiError, setApiError] = useState(false);
 
-  // Load makes on mount
+  // Derived: unique base models and trims for selected base model
+  const baseModels = [...new Set(allModels.map(extractBaseModel))].sort();
+
+  const selectedBaseModel = vehicle.modelName;
+  const trims = selectedBaseModel
+    ? allModels
+        .filter(m => extractBaseModel(m) === selectedBaseModel && m !== selectedBaseModel)
+        .map(m => m.slice(selectedBaseModel.length).trim())
+        .filter(Boolean)
+    : [];
+
+  // Load makes when year changes
   useEffect(() => {
+    if (!vehicle.year) {
+      setMakes([]);
+      return;
+    }
     setLoadingMakes(true);
-    fetchAllMakes()
+    setApiError(false);
+    fetchMakes(vehicle.year)
       .then(data => setMakes(sortMakes(data)))
       .catch(() => setApiError(true))
       .finally(() => setLoadingMakes(false));
-  }, []);
+  }, [vehicle.year]);
 
-  // Load models when make + year changes
+  // Load models when year + make changes
   useEffect(() => {
-    if (!vehicle.makeId || !vehicle.year) {
-      setModels([]);
+    if (!vehicle.year || !vehicle.makeName) {
+      setAllModels([]);
       return;
     }
     setLoadingModels(true);
-    fetchModelsForMake(Number(vehicle.makeId))
-      .then(data => setModels(data.sort((a, b) => a.modelName.localeCompare(b.modelName))))
-      .catch(() => setModels([]))
+    fetchModels(vehicle.year, vehicle.makeName)
+      .then(data => setAllModels(data))
+      .catch(() => setAllModels([]))
       .finally(() => setLoadingModels(false));
-  }, [vehicle.makeId, vehicle.year]);
+  }, [vehicle.year, vehicle.makeName]);
 
-  // Load trims + resolve body class when model selected
-  const loadTrims = useCallback(async () => {
-    if (!vehicle.makeName || !vehicle.modelName || !vehicle.year) return;
-
-    // 1. Immediately apply heuristic body class guess so visualization shows something fast
-    const guessed = guessBodyClassFromModel(vehicle.modelName);
-    if (guessed) {
-      dispatch({ type: 'SET_VEHICLE', payload: { bodyClass: guessed } });
-    }
-
-    try {
-      const trimData = await fetchTrims(vehicle.makeName, vehicle.modelName, vehicle.year);
-      setTrims(trimData);
-
-      // If heuristic didn't match, default to Sedan
-      if (!guessed) {
-        dispatch({ type: 'SET_VEHICLE', payload: { bodyClass: 'Sedan' } });
-      }
-    } catch {
-      setTrims([]);
-    }
-  }, [vehicle.makeName, vehicle.modelName, vehicle.year, dispatch]);
-
+  // Resolve body class when model changes
   useEffect(() => {
-    if (vehicle.modelName) loadTrims();
-  }, [vehicle.modelName, loadTrims]);
+    if (!vehicle.modelName) return;
+    const guessed = guessBodyClassFromModel(vehicle.modelName);
+    dispatch({ type: 'SET_VEHICLE', payload: { bodyClass: guessed ?? 'Sedan' } });
+  }, [vehicle.modelName, dispatch]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
@@ -126,9 +127,8 @@ export function Step2VehicleSelect() {
               value={vehicle.year ?? ''}
               onChange={e => {
                 const year = Number(e.target.value);
-                dispatch({ type: 'SET_VEHICLE', payload: { year, modelId: null, modelName: null, trim: null, bodyClass: null } });
-                setModels([]);
-                setTrims([]);
+                dispatch({ type: 'SET_VEHICLE', payload: { year, makeId: null, makeName: null, modelId: null, modelName: null, trim: null, bodyClass: null } });
+                setAllModels([]);
               }}
               className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-sm font-medium text-slate-800 bg-white focus:border-brand-400 focus:outline-none transition-colors"
             >
@@ -144,21 +144,24 @@ export function Step2VehicleSelect() {
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">Make</label>
             <div className="relative">
               <select
-                value={vehicle.makeId ?? ''}
+                value={vehicle.makeName ?? ''}
                 onChange={e => {
-                  const selected = makes.find(m => String(m.makeId) === e.target.value);
                   dispatch({ type: 'SET_VEHICLE', payload: {
                     makeId: e.target.value,
-                    makeName: selected?.makeName ?? null,
+                    makeName: e.target.value || null,
+                    modelId: null,
+                    modelName: null,
+                    trim: null,
+                    bodyClass: null,
                   }});
-                  setTrims([]);
+                  setAllModels([]);
                 }}
                 disabled={!vehicle.year || loadingMakes}
                 className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-sm font-medium text-slate-800 bg-white focus:border-brand-400 focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">Select make</option>
                 {makes.map(m => (
-                  <option key={m.makeId} value={m.makeId}>{m.makeName}</option>
+                  <option key={m} value={m}>{m}</option>
                 ))}
               </select>
               {loadingMakes && (
@@ -174,21 +177,20 @@ export function Step2VehicleSelect() {
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">Model</label>
             <div className="relative">
               <select
-                value={vehicle.modelId ?? ''}
+                value={vehicle.modelName ?? ''}
                 onChange={e => {
-                  const selected = models.find(m => String(m.modelId) === e.target.value);
                   dispatch({ type: 'SET_VEHICLE', payload: {
                     modelId: e.target.value,
-                    modelName: selected?.modelName ?? null,
+                    modelName: e.target.value || null,
+                    trim: null,
                   }});
-                  setTrims([]);
                 }}
-                disabled={!vehicle.makeId || loadingModels || models.length === 0}
+                disabled={!vehicle.makeName || loadingModels || baseModels.length === 0}
                 className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-sm font-medium text-slate-800 bg-white focus:border-brand-400 focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="">{!vehicle.makeId ? 'Select make first' : 'Select model'}</option>
-                {models.map(m => (
-                  <option key={m.modelId} value={m.modelId}>{m.modelName}</option>
+                <option value="">{!vehicle.makeName ? 'Select make first' : 'Select model'}</option>
+                {baseModels.map(m => (
+                  <option key={m} value={m}>{m}</option>
                 ))}
               </select>
               {loadingModels && (
@@ -199,28 +201,26 @@ export function Step2VehicleSelect() {
             </div>
           </div>
 
-          {/* Trim (optional) */}
+          {/* Trim (derived from model variants) */}
           {trims.length > 0 && (
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                 Trim <span className="text-slate-400 font-normal">(optional)</span>
               </label>
-              <div className="relative">
-                <select
-                  value={vehicle.trim ?? ''}
-                  onChange={e => dispatch({ type: 'SET_VEHICLE', payload: { trim: e.target.value || null } })}
-                  className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-sm font-medium text-slate-800 bg-white focus:border-brand-400 focus:outline-none transition-colors"
-                >
-                  <option value="">Any trim</option>
-                  {trims.map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
+              <select
+                value={vehicle.trim ?? ''}
+                onChange={e => dispatch({ type: 'SET_VEHICLE', payload: { trim: e.target.value || null } })}
+                className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-sm font-medium text-slate-800 bg-white focus:border-brand-400 focus:outline-none transition-colors"
+              >
+                <option value="">Any trim</option>
+                {trims.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
           )}
 
-          {/* Fleet size — only shown for fleet project type */}
+          {/* Fleet size */}
           {isFleet && (
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">
@@ -245,11 +245,11 @@ export function Step2VehicleSelect() {
             </div>
           )}
 
-          {/* Manual body type fallback (shown if API fails) */}
+          {/* Manual body type fallback */}
           {apiError && (
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
               <p className="text-sm text-amber-800 mb-3">
-                ⚠️ Vehicle database unavailable. Please select your vehicle type manually:
+                Vehicle database unavailable. Please select your vehicle type manually:
               </p>
               <select
                 value={vehicle.bodyClass ?? ''}
@@ -257,7 +257,7 @@ export function Step2VehicleSelect() {
                   bodyClass: e.target.value || null,
                   makeName: 'Unknown',
                   modelName: 'Vehicle',
-                  year: CURRENT_YEAR,
+                  year: new Date().getFullYear(),
                 }})}
                 className="w-full rounded-xl border-2 border-amber-200 px-4 py-3 text-sm font-medium text-slate-800 bg-white focus:border-amber-400 focus:outline-none"
               >

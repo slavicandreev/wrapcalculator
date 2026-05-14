@@ -24,11 +24,6 @@ class WMP_REST_API {
             'permission_callback' => '__return_true',
         ]);
 
-        register_rest_route(self::NAMESPACE, '/trims', [
-            'methods'             => 'GET',
-            'callback'            => [self::class, 'proxy_trims'],
-            'permission_callback' => '__return_true',
-        ]);
     }
 
     // ─── Rate Limiting ───────────────────────────────────────────────────────
@@ -363,45 +358,6 @@ class WMP_REST_API {
         }
 
         return new WP_REST_Response(['success' => true], 200);
-    }
-
-    // ─── Proxy: CarAPI Trims ─────────────────────────────────────────────────
-
-    public static function proxy_trims(WP_REST_Request $request) {
-        if (!self::check_rate_limit('trims', 60)) {
-            return new WP_REST_Response(['error' => 'Rate limit exceeded'], 429);
-        }
-
-        $year  = sanitize_text_field($request->get_param('year'));
-        $make  = sanitize_text_field($request->get_param('make'));
-        $model = sanitize_text_field($request->get_param('model'));
-        $limit = intval($request->get_param('limit') ?: 50);
-
-        if (empty($year) || empty($make) || empty($model)) {
-            return new WP_REST_Response(['error' => 'Missing year, make, or model'], 400);
-        }
-
-        $url = add_query_arg([
-            'year'  => $year,
-            'make'  => $make,
-            'model' => $model,
-            'limit' => min($limit, 50),
-        ], 'https://carapi.app/api/trims/v2');
-
-        $response = wp_remote_get($url, ['timeout' => 10]);
-
-        if (is_wp_error($response)) {
-            return new WP_REST_Response(['error' => 'Failed to fetch trims'], 502);
-        }
-
-        $status = wp_remote_retrieve_response_code($response);
-        $body   = json_decode(wp_remote_retrieve_body($response), true);
-
-        if ($status !== 200 || !is_array($body)) {
-            return new WP_REST_Response(['error' => 'CarAPI request failed'], 502);
-        }
-
-        return new WP_REST_Response($body, 200);
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
